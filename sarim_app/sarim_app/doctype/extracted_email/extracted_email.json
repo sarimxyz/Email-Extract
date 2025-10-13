@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-10-10 13:24:52.417957",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "extracted_email_section",
+  "sender",
+  "subject",
+  "message_body",
+  "received_date",
+  "source_email_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "extracted_email_section",
+   "fieldtype": "Section Break",
+   "label": "Extracted Email"
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "message_body",
+   "fieldtype": "Long Text",
+   "label": "Message body"
+  },
+  {
+   "fieldname": "received_date",
+   "fieldtype": "Datetime",
+   "label": "Received Date"
+  },
+  {
+   "fieldname": "source_email_id",
+   "fieldtype": "Data",
+   "label": "Source Email ID"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-10 14:41:14.742505",
+ "modified_by": "Administrator",
+ "module": "Sarim App",
+ "name": "Extracted Email",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
