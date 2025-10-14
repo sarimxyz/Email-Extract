@@ -173,7 +173,7 @@ app_license = "mit"
 scheduler_events = {
     "cron": {
         "*/1 * * * *": [
-            "sarim_app.sarim_app.extracted_email.extract_emails_scheduler"
+            "sarim_app.sarim_app.doctype.extracted_email_new.extracted_email_new.extract_emails_scheduler"
         ]
     }
 }
