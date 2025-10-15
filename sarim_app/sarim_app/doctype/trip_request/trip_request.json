@@ -24,12 +24,12 @@
   },
   {
    "fieldname": "pickup_date",
-   "fieldtype": "Date",
+   "fieldtype": "Data",
    "label": "Pickup Date"
   },
   {
    "fieldname": "pickup_time",
-   "fieldtype": "Time",
+   "fieldtype": "Data",
    "label": "Pickup Time"
   },
   {
@@ -41,7 +41,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-14 11:35:29.949837",
+ "modified": "2025-10-15 11:38:46.904392",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "Trip Request",
