@@ -9,7 +9,10 @@
   "subject",
   "message_body",
   "received_date",
-  "source_email_id"
+  "source_email_id",
+  "communication_link",
+  "trip_request_status",
+  "trip_request_error"
  ],
  "fields": [
   {
@@ -36,12 +39,29 @@
    "fieldname": "source_email_id",
    "fieldtype": "Data",
    "label": "Source Email Id"
+  },
+  {
+   "fieldname": "communication_link",
+   "fieldtype": "Link",
+   "label": "Communication Link",
+   "options": "Communication"
+  },
+  {
+   "fieldname": "trip_request_status",
+   "fieldtype": "Select",
+   "label": "Trip Request Status",
+   "options": "Pending\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "trip_request_error",
+   "fieldtype": "Long Text",
+   "label": "Trip Request Error"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-14 12:47:34.661200",
+ "modified": "2025-10-16 11:21:09.035926",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "Extracted Email New",

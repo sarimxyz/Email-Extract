@@ -9,7 +9,9 @@
   "drop_location",
   "pickup_date",
   "pickup_time",
-  "passenger_number"
+  "passenger_number",
+  "passenger_name",
+  "mail_link"
  ],
  "fields": [
   {
@@ -36,12 +38,23 @@
    "fieldname": "passenger_number",
    "fieldtype": "Data",
    "label": "Passenger Number"
+  },
+  {
+   "fieldname": "passenger_name",
+   "fieldtype": "Data",
+   "label": "Passenger Name"
+  },
+  {
+   "fieldname": "mail_link",
+   "fieldtype": "Link",
+   "label": "Mail Link",
+   "options": "Communication"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-15 11:38:46.904392",
+ "modified": "2025-10-15 16:43:26.811500",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "Trip Request",
