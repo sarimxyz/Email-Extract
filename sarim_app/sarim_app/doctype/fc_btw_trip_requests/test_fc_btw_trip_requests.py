@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestExtractedEmail(FrappeTestCase):
+class TestFC_BTW_Trip_Requests(FrappeTestCase):
 	pass

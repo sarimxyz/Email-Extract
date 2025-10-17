@@ -1,7 +1,7 @@
 // Copyright (c) 2025, sarim and contributors
 // For license information, please see license.txt
 
-// frappe.ui.form.on("Extracted Email", {
+// frappe.ui.form.on("FC_BTW_Trip_Requests", {
 // 	refresh(frm) {
 
 // 	},
