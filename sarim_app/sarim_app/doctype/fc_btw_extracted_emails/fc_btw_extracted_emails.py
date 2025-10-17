@@ -223,19 +223,16 @@ def process_received_emails_to_trip_requests():
         try:
             response = client.messages.create(
                 model="claude-3-5-sonnet-20240620",
-                max_tokens=200,
+                max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_output = response.content[0].text.strip()
             print(f"Email: {comm['name']} -> AI Output: {ai_output}")
             
-            if hasattr(response, "usage") and response.usage:
-                usage = response.usage
-                prompt_tokens = getattr(usage, "prompt_tokens", 0)
-                completion_tokens = getattr(usage, "completion_tokens", 0)
-                total_tokens = getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
-            else:
-                prompt_tokens = completion_tokens = total_tokens = 0    
+            prompt_tokens = response.usage.input_tokens
+            completion_tokens = response.usage.output_tokens
+            total_tokens = prompt_tokens + completion_tokens
+                
             # 7️⃣ Parse JSON
             try:
                 data = json.loads(ai_output)
