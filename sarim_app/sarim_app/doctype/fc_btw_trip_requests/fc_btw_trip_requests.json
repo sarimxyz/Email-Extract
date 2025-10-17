@@ -54,10 +54,11 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-15 16:43:26.811500",
+ "modified": "2025-10-17 12:09:26.459282",
  "modified_by": "Administrator",
  "module": "Sarim App",
- "name": "Trip Request",
+ "name": "FC_BTW_Trip_Requests",
+ "naming_rule": "By script",
  "owner": "Administrator",
  "permissions": [
   {

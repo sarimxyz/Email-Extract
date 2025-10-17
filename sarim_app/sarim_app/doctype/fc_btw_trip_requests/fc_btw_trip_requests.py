@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class TripRequest(Document):
+class FC_BTW_Trip_Requests(Document):
 	pass
