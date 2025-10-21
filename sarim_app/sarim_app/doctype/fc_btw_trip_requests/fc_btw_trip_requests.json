@@ -11,6 +11,15 @@
   "pickup_time",
   "passenger_number",
   "passenger_name",
+  "reporting_time",
+  "vehicle_type",
+  "city",
+  "duty_type",
+  "request_type",
+  "notes",
+  "remarks",
+  "special_request",
+  "miscellaneous_requirements",
   "mail_link",
   "email_message_body",
   "ai_token_usage",
@@ -67,12 +76,57 @@
    "fieldname": "ai_token_usage",
    "fieldtype": "Data",
    "label": "Ai Token Usage"
+  },
+  {
+   "fieldname": "reporting_time",
+   "fieldtype": "Data",
+   "label": "Reporting Time"
+  },
+  {
+   "fieldname": "vehicle_type",
+   "fieldtype": "Data",
+   "label": "Vehicle Type"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "miscellaneous_requirements",
+   "fieldtype": "Long Text",
+   "label": "Miscellaneous Requirements"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Long Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Long Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "duty_type",
+   "fieldtype": "Data",
+   "label": "Duty Type"
+  },
+  {
+   "fieldname": "request_type",
+   "fieldtype": "Data",
+   "label": "Request Type"
+  },
+  {
+   "fieldname": "special_request",
+   "fieldtype": "Long Text",
+   "label": "Special Request"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-17 18:11:36.756031",
+ "modified": "2025-10-21 14:48:53.212297",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
