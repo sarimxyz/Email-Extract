@@ -11,7 +11,10 @@
   "pickup_time",
   "passenger_number",
   "passenger_name",
-  "mail_link"
+  "mail_link",
+  "email_message_body",
+  "ai_token_usage",
+  "ai_json_response"
  ],
  "fields": [
   {
@@ -49,12 +52,27 @@
    "fieldtype": "Link",
    "label": "Mail Link",
    "options": "Communication"
+  },
+  {
+   "fieldname": "email_message_body",
+   "fieldtype": "Long Text",
+   "label": "Email Message Body"
+  },
+  {
+   "fieldname": "ai_json_response",
+   "fieldtype": "Code",
+   "label": "AI JSON Response"
+  },
+  {
+   "fieldname": "ai_token_usage",
+   "fieldtype": "Data",
+   "label": "Ai Token Usage"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-17 12:09:26.459282",
+ "modified": "2025-10-17 18:11:36.756031",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
