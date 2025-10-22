@@ -2,19 +2,52 @@ import frappe
 from frappe.model.document import Document
 
 class FC_BTW_Trip_Requests(Document):
-	def autoname(self):
-		sender = self.passenger_name or "unknown"
-		date_obj = frappe.utils.get_datetime(self.pickup_date) if self.pickup_date else frappe.utils.now_datetime()
-		timestamp = date_obj.strftime("%d-%m-%Y_%I-%M %p")
+    def autoname(self):
+        # Use the base name field, not self.name
+        base_name = getattr(self, "trip_name", None)
+        if not base_name:
+            base_name = "unknown"
 
-		base_name = f"{sender}_{timestamp}"
-		existing_count = frappe.db.count(
-			"FC_BTW_Trip_Requests",
-			{"name": ["like", f"{base_name}%"]}
-		)
+        # Append _TR
+        base_name = f"{base_name}_TR"
 
-		self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
+        # Count existing trips with same base
+        existing_count = frappe.db.count(
+            "FC_BTW_Trip_Requests",
+            {"name": ["like", f"{base_name}%"]}
+        )
 
+        # Final name: add number if duplicates exist
+        self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
+
+
+# class FC_BTW_Trip_Requests(Document):
+# 	def autoname(self):
+# 		sender = self.passenger_name or "unknown"
+# 		date_obj = frappe.utils.get_datetime(self.pickup_date) if self.pickup_date else frappe.utils.now_datetime()
+# 		timestamp = date_obj.strftime("%d-%m-%Y_%I-%M %p")
+
+# 		base_name = f"{sender}_{timestamp}"
+# 		existing_count = frappe.db.count(
+# 			"FC_BTW_Trip_Requests",
+# 			{"name": ["like", f"{base_name}%"]}
+# 		)
+
+# 		self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
+
+# class FC_BTW_Trip_Requests(Document):
+#     def autoname(self):
+#         # Use the extracted email name as base
+#         base_name = getattr(self, "name", "unknown") + "_TR"
+
+#         # Count existing trips with same base
+#         existing_count = frappe.db.count(
+#             "FC_BTW_Trip_Requests",
+#             {"name": ["like", f"{base_name}%"]}
+#         )
+
+#         # Final name: add number if duplicates exist
+#         self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
 
 # import frappe
 # from frappe.model.document import Document

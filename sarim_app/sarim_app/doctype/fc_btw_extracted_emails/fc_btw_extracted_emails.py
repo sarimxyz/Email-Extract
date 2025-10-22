@@ -260,30 +260,20 @@ def process_received_emails_to_trip_requests():
 
  
         # 8️⃣ Insert into Trip Request
-        try:
-                # count existing trips with same base
-                existing_count = frappe.db.count(
-                "FC_BTW_Trip_Requests",
-                {"name": ["like", f"{base_name}%"]}
-                )   
-
-                if existing_count == 0:
-                    trip_name = base_name
-                else:
-                    trip_name = f"{base_name}_{existing_count + 1}"   
+        try:  
                 trip = frappe.get_doc({
                     "doctype": "FC_BTW_Trip_Requests",
-                    "name":trip_name,
-                    "pickup_location": data.get("pickup_location") or "",
-                    "drop_location": data.get("drop_location") or "",
-                    "pickup_date": data.get("pickup_date") or "",
-                    "pickup_time": data.get("pickup_time") or "",
-                    "reporting_time": data.get("reporting_time") or "",
+                    "trip_name":base_name,
+                    # "pickup_location": data.get("pickup_location") or "",
+                    # "drop_location": data.get("drop_location") or "",
+                    # "pickup_date": data.get("pickup_date") or "",
+                    # "pickup_time": data.get("pickup_time") or "",
+                    # "reporting_time": data.get("reporting_time") or "",
                     "vehicle_type": data.get("vehicle_type") or "",
                     "city": data.get("city") or "",
                     "miscellaneous_requirements": data.get("miscellaneous_requirements") or "",
-                    "passenger_number": data.get("contact_number") or "",
-                    "passenger_name": data.get("passenger_name") or "",
+                    # "passenger_number": data.get("contact_number") or "",
+                    # "passenger_name": data.get("passenger_name") or "",
                     "duty_type":data.get("duty_type") or "",
                     "request_type":data.get("request_type") or "",
                     "special_request":data.get("special_request") or "",
@@ -294,6 +284,21 @@ def process_received_emails_to_trip_requests():
                     "ai_json_response": ai_output,
                     "ai_token_usage": total_tokens
                 })
+
+                bookings = data.get("bookings", [])
+                if isinstance(bookings, dict):  # safety for single object
+                    bookings = [bookings]
+
+                for b in bookings:
+                    trip.append("table_rtlw", {
+                        "passenger_name": b.get("passenger_name") or "",
+                        "passenger_number": b.get("passenger_number") or "",
+                        "pickup_location": b.get("pickup_location") or "",
+                        "drop_location": b.get("drop_location") or "",
+                        "pickup_date": b.get("pickup_date") or "",
+                        "pickup_time": b.get("pickup_time") or "",
+                        "drop_time": b.get("drop_time") or ""
+                    })
                 trip.insert()
                 frappe.db.commit()
 
