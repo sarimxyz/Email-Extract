@@ -14,16 +14,21 @@
   "reporting_time",
   "vehicle_type",
   "city",
-  "duty_type",
   "request_type",
+  "duty_type",
   "notes",
+  "column_break_yckv",
   "remarks",
-  "special_request",
   "miscellaneous_requirements",
+  "special_request",
+  "column_break_nudj",
   "mail_link",
   "email_message_body",
+  "column_break_sirz",
   "ai_token_usage",
-  "ai_json_response"
+  "ai_json_response",
+  "section_break_xrje",
+  "table_rtlw"
  ],
  "fields": [
   {
@@ -121,12 +126,33 @@
    "fieldname": "special_request",
    "fieldtype": "Long Text",
    "label": "Special Request"
+  },
+  {
+   "fieldname": "section_break_xrje",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "table_rtlw",
+   "fieldtype": "Table",
+   "options": "FC_TR_table"
+  },
+  {
+   "fieldname": "column_break_yckv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_nudj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_sirz",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-21 14:48:53.212297",
+ "modified": "2025-10-22 11:09:26.064393",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
