@@ -135,7 +135,7 @@
   {
    "fieldname": "table_rtlw",
    "fieldtype": "Table",
-   "options": "FC_TR_table"
+   "options": "FC_TR_MultipleBooking_CT"
   },
   {
    "fieldname": "column_break_yckv",
@@ -158,7 +158,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-22 12:51:56.690510",
+ "modified": "2025-10-23 10:57:16.370648",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",

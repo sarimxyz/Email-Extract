@@ -58,7 +58,7 @@
  "modified": "2025-10-22 11:20:58.158440",
  "modified_by": "Administrator",
  "module": "Sarim App",
- "name": "FC_TR_table",
+ "name": "FC_TR_MultipleBooking_CT",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

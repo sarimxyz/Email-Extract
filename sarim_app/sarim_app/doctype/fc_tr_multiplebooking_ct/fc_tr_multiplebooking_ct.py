@@ -5,5 +5,5 @@
 from frappe.model.document import Document
 
 
-class FC_TR_table(Document):
+class FC_TR_MultipleBooking_CT(Document):
 	pass
