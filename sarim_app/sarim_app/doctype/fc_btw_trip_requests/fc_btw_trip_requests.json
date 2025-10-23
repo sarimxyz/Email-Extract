@@ -5,63 +5,28 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "section_break_xrje",
+  "table_rtlw",
+  "section_break_iufs",
   "trip_name",
-  "pickup_location",
-  "drop_location",
-  "pickup_date",
-  "pickup_time",
-  "passenger_number",
-  "passenger_name",
   "reporting_time",
   "vehicle_type",
   "city",
   "request_type",
   "duty_type",
-  "notes",
   "column_break_yckv",
+  "notes",
   "remarks",
-  "miscellaneous_requirements",
+  "column_break_wouh",
   "special_request",
+  "miscellaneous_requirements",
   "column_break_nudj",
   "mail_link",
   "email_message_body",
-  "column_break_sirz",
   "ai_token_usage",
-  "ai_json_response",
-  "section_break_xrje",
-  "table_rtlw"
+  "ai_json_response"
  ],
  "fields": [
-  {
-   "fieldname": "pickup_location",
-   "fieldtype": "Data",
-   "label": "Pickup Location"
-  },
-  {
-   "fieldname": "drop_location",
-   "fieldtype": "Data",
-   "label": "Drop Location"
-  },
-  {
-   "fieldname": "pickup_date",
-   "fieldtype": "Data",
-   "label": "Pickup Date"
-  },
-  {
-   "fieldname": "pickup_time",
-   "fieldtype": "Data",
-   "label": "Pickup Time"
-  },
-  {
-   "fieldname": "passenger_number",
-   "fieldtype": "Data",
-   "label": "Passenger Number"
-  },
-  {
-   "fieldname": "passenger_name",
-   "fieldtype": "Data",
-   "label": "Passenger Name"
-  },
   {
    "fieldname": "mail_link",
    "fieldtype": "Link",
@@ -74,6 +39,7 @@
    "label": "Email Message Body"
   },
   {
+   "columns": 2,
    "fieldname": "ai_json_response",
    "fieldtype": "Code",
    "label": "AI JSON Response"
@@ -146,19 +112,23 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "column_break_sirz",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "trip_name",
    "fieldtype": "Data",
    "label": "Trip Name"
+  },
+  {
+   "fieldname": "column_break_wouh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_iufs",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-23 10:57:16.370648",
+ "modified": "2025-10-23 16:54:06.030839",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
