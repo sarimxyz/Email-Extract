@@ -7,6 +7,8 @@
  "field_order": [
   "sender",
   "subject",
+  "has_multiple_bookings",
+  "number_of_bookings",
   "message_body",
   "received_date",
   "communication_link",
@@ -56,12 +58,23 @@
    "fieldname": "source_email_id",
    "fieldtype": "Data",
    "label": "Source Email Id"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_multiple_bookings",
+   "fieldtype": "Check",
+   "label": "Has Multiple Bookings"
+  },
+  {
+   "fieldname": "number_of_bookings",
+   "fieldtype": "Int",
+   "label": "Number of Bookings"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-17 17:39:44.475229",
+ "modified": "2025-10-21 15:36:30.467513",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Extracted_Emails",

@@ -1,0 +1,69 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-10-22 10:32:36.676579",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "passenger_name",
+  "passenger_number",
+  "pickup_location",
+  "drop_location",
+  "pickup_date",
+  "pickup_time",
+  "drop_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "pickup_location",
+   "fieldtype": "Data",
+   "label": "Pickup Location"
+  },
+  {
+   "fieldname": "drop_location",
+   "fieldtype": "Data",
+   "label": "Drop Location"
+  },
+  {
+   "fieldname": "pickup_time",
+   "fieldtype": "Data",
+   "label": "Pickup Time"
+  },
+  {
+   "fieldname": "drop_time",
+   "fieldtype": "Data",
+   "label": "Drop Time"
+  },
+  {
+   "fieldname": "passenger_name",
+   "fieldtype": "Data",
+   "label": "Passenger Name"
+  },
+  {
+   "fieldname": "passenger_number",
+   "fieldtype": "Data",
+   "label": "Passenger Number"
+  },
+  {
+   "fieldname": "pickup_date",
+   "fieldtype": "Data",
+   "label": "Pickup Date"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-10-22 11:20:58.158440",
+ "modified_by": "Administrator",
+ "module": "Sarim App",
+ "name": "FC_TR_MultipleBooking_CT",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

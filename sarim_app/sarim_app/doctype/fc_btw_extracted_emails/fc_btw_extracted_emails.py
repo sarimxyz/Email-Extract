@@ -153,12 +153,12 @@ import json
 class FC_BTW_Extracted_Emails(Document):
     def autoname(self):
         """
-        Naming convention: sender-email_YYYYMMDD_HHMMSS
+        Naming: sender_dd-mm-yyyy_HH-MM-SS
         """
         
         sender = self.sender or "unknown"
         # keep sender as-is
-        timestamp = self.received_date.strftime("%m-%d-%Y_%I:%M %p")  # 12-hour format with AM/PM
+        timestamp = self.received_date.strftime("%d-%m-%Y_%I-%M %p")  # 12-hour format with AM/PM
         self.name = f"{sender}_{timestamp}"
 
 
@@ -207,9 +207,9 @@ def process_received_emails_to_trip_requests():
             })
             email_doc.insert()
             frappe.db.commit()
-            print(f"Added email {comm['name']} to Extracted Emails")
+            # print(f"Added email {comm['name']} to Extracted Emails")
         except Exception as ex:
-            print(f"Failed to add email {comm['name']}: {ex}")
+            # print(f"Failed to add email {comm['name']}: {ex}")
             continue
 
         # Fetch prompt from Cab Settings
@@ -227,59 +227,90 @@ def process_received_emails_to_trip_requests():
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_output = response.content[0].text.strip()
-            print(f"Email: {comm['name']} -> AI Output: {ai_output}")
-            
             prompt_tokens = response.usage.input_tokens
             completion_tokens = response.usage.output_tokens
             total_tokens = prompt_tokens + completion_tokens
+        except Exception as e:
+            email_doc.trip_request_status = "Failed"
+            email_doc.trip_request_error = f"Claude API call failed: {str(e)}"
+            email_doc.save()
+            frappe.db.commit()
+            continue
+            
+            
                 
-            # 7️⃣ Parse JSON
-            try:
-                data = json.loads(ai_output)
-            except json.JSONDecodeError:
-                print(f"Invalid JSON from Claude for email {comm['name']}")
-                email_doc.trip_request_status = "Failed"
-                email_doc.trip_request_error = "Invalid JSON from Claude"
-                email_doc.save()
-                frappe.db.commit()
-                continue
+        # 7️⃣ Parse JSON
+        try:
+            data = json.loads(ai_output)
+        except json.JSONDecodeError as e:
+            email_doc.trip_request_status = "Failed"
+            email_doc.trip_request_error = f"JSON decode error: {str(e)}"
+            email_doc.has_multiple_bookings = False
+            email_doc.number_of_bookings = 0
+            email_doc.save()
+            frappe.db.commit()
+            continue
 
-            # 8️⃣ Insert into Trip Request
-            try:
+        # ✅ JSON parsed successfully → update Extracted Email immediately
+        email_doc.has_multiple_bookings = data.get("has_multiple_bookings", False)
+        email_doc.number_of_bookings = data.get("number_of_bookings", 0)
+        email_doc.save()
+        frappe.db.commit()
+        base_name = email_doc.name  # sender_dd-mm-yyyy_HH-MM-SS
+
+ 
+        # 8️⃣ Insert into Trip Request
+        try:  
                 trip = frappe.get_doc({
                     "doctype": "FC_BTW_Trip_Requests",
-                    "pickup_location": data.get("pickup_location") or "",
-                    "drop_location": data.get("drop_location") or "",
-                    "pickup_date": data.get("pickup_date") or "",
-                    "pickup_time": data.get("pickup_time") or "",
-                    "passenger_number": data.get("contact_number") or "",
-                    "passenger_name": data.get("passenger_name") or "",
+                    "trip_name":base_name,
+                    # "pickup_location": data.get("pickup_location") or "",
+                    # "drop_location": data.get("drop_location") or "",
+                    # "pickup_date": data.get("pickup_date") or "",
+                    # "pickup_time": data.get("pickup_time") or "",
+                    # "reporting_time": data.get("reporting_time") or "",
+                    "vehicle_type": data.get("vehicle_type") or "",
+                    "city": data.get("city") or "",
+                    "miscellaneous_requirements": data.get("miscellaneous_requirements") or "",
+                    # "passenger_number": data.get("contact_number") or "",
+                    # "passenger_name": data.get("passenger_name") or "",
+                    "duty_type":data.get("duty_type") or "",
+                    "request_type":data.get("request_type") or "",
+                    "special_request":data.get("special_request") or "",
+                    "remarks":data.get("remarks") or "",
+                    "notes":data.get("notes") or "",
                     "mail_link": comm["name"],
                     "email_message_body": plain_text,
                     "ai_json_response": ai_output,
                     "ai_token_usage": total_tokens
                 })
+
+                bookings = data.get("bookings", [])
+                if isinstance(bookings, dict):  # safety for single object
+                    bookings = [bookings]
+
+                for b in bookings:
+                    trip.append("table_rtlw", {
+                        "passenger_name": b.get("passenger_name") or "",
+                        "passenger_number": b.get("passenger_number") or "",
+                        "pickup_location": b.get("pickup_location") or "",
+                        "drop_location": b.get("drop_location") or "",
+                        "pickup_date": b.get("pickup_date") or "",
+                        "pickup_time": b.get("pickup_time") or "",
+                        "drop_time": b.get("drop_time") or ""
+                    })
                 trip.insert()
                 frappe.db.commit()
 
                 # ✅ Update Extracted Email
-                email_doc.trip_request_status = "Success"
+                email_doc.trip_request_status = "Successful"
                 email_doc.trip_request_error = ""
                 email_doc.save()
                 frappe.db.commit()
 
-                print(f"Trip Request created for email {comm['name']}")
-
-            except Exception as ex:
+        except Exception as ex:
                 email_doc.trip_request_status = "Failed"
                 email_doc.trip_request_error = str(ex)
                 email_doc.save()
                 frappe.db.commit()
                 print(f"Failed to create Trip Request for email {comm['name']}: {ex}")
-
-        except Exception as e:
-            email_doc.trip_request_status = "Failed"
-            email_doc.trip_request_error = f"Claude API call failed: {e}"
-            email_doc.save()
-            frappe.db.commit()
-            print(f"Claude API call failed for email {comm['name']}: {e}")

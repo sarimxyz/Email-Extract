@@ -5,16 +5,31 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "trip_name",
   "pickup_location",
   "drop_location",
   "pickup_date",
   "pickup_time",
   "passenger_number",
   "passenger_name",
+  "reporting_time",
+  "vehicle_type",
+  "city",
+  "request_type",
+  "duty_type",
+  "notes",
+  "column_break_yckv",
+  "remarks",
+  "miscellaneous_requirements",
+  "special_request",
+  "column_break_nudj",
   "mail_link",
   "email_message_body",
+  "column_break_sirz",
   "ai_token_usage",
-  "ai_json_response"
+  "ai_json_response",
+  "section_break_xrje",
+  "table_rtlw"
  ],
  "fields": [
   {
@@ -67,12 +82,83 @@
    "fieldname": "ai_token_usage",
    "fieldtype": "Data",
    "label": "Ai Token Usage"
+  },
+  {
+   "fieldname": "reporting_time",
+   "fieldtype": "Data",
+   "label": "Reporting Time"
+  },
+  {
+   "fieldname": "vehicle_type",
+   "fieldtype": "Data",
+   "label": "Vehicle Type"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "miscellaneous_requirements",
+   "fieldtype": "Long Text",
+   "label": "Miscellaneous Requirements"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Long Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Long Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "duty_type",
+   "fieldtype": "Data",
+   "label": "Duty Type"
+  },
+  {
+   "fieldname": "request_type",
+   "fieldtype": "Data",
+   "label": "Request Type"
+  },
+  {
+   "fieldname": "special_request",
+   "fieldtype": "Long Text",
+   "label": "Special Request"
+  },
+  {
+   "fieldname": "section_break_xrje",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "table_rtlw",
+   "fieldtype": "Table",
+   "options": "FC_TR_MultipleBooking_CT"
+  },
+  {
+   "fieldname": "column_break_yckv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_nudj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_sirz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trip_name",
+   "fieldtype": "Data",
+   "label": "Trip Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-17 18:11:36.756031",
+ "modified": "2025-10-23 10:57:16.370648",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
