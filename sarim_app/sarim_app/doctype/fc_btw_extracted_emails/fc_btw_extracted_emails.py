@@ -180,7 +180,7 @@ def process_received_emails_to_trip_requests():
         filters={
             "communication_type": "Communication",
             "sent_or_received": "Received",
-            "subject": ["like", "%cab booking%"]
+            "subject": ["like", "%Fabcars App%"]
         },
         fields=["sender", "subject", "content", "creation", "name"]
     )
@@ -290,7 +290,7 @@ def process_received_emails_to_trip_requests():
                     bookings = [bookings]
 
                 for b in bookings:
-                    trip.append("table_rtlw", {
+                    trip.append("table_lftf", {
                         "passenger_name": b.get("passenger_name") or "",
                         "passenger_number": b.get("passenger_number") or "",
                         "pickup_location": b.get("pickup_location") or "",

@@ -24,8 +24,8 @@
   "email_message_body",
   "ai_token_usage",
   "ai_json_response",
-  "booking_details_tab",
-  "table_rtlw"
+  "tab_2_tab",
+  "table_lftf"
  ],
  "fields": [
   {
@@ -96,11 +96,6 @@
    "label": "Special Request"
   },
   {
-   "fieldname": "table_rtlw",
-   "fieldtype": "Table",
-   "options": "FC_TR_MultipleBooking_CT"
-  },
-  {
    "fieldname": "column_break_yckv",
    "fieldtype": "Column Break"
   },
@@ -127,15 +122,20 @@
    "label": "Trip Summary"
   },
   {
-   "fieldname": "booking_details_tab",
+   "fieldname": "tab_2_tab",
    "fieldtype": "Tab Break",
    "label": "Booking Details"
+  },
+  {
+   "fieldname": "table_lftf",
+   "fieldtype": "Table",
+   "options": "FC_TR_MultipleBooking_CT"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-24 15:34:38.262785",
+ "modified": "2025-10-24 16:37:42.163068",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
