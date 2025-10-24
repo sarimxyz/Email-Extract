@@ -222,7 +222,7 @@ def process_received_emails_to_trip_requests():
         # 6️⃣ Call Claude
         try:
             response = client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="claude-4-sonnet-20250514",
                 max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}]
             )

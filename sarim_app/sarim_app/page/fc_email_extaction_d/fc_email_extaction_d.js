@@ -25,11 +25,10 @@ function create_dashboard(page) {
 				<div class="col-md-3">
 					<label>Trip Status</label>
 					<select class="form-control" id="trip_status">
-						<option value="">All Status</option>
-						<option value="New">New</option>
-						<option value="In Progress">In Progress</option>
-						<option value="Completed">Completed</option>
-						<option value="Cancelled">Cancelled</option>
+					<option value="">All</option>
+					<option value="Pending">Pending</option>
+					<option value="Successful">Successful</option>
+					<option value="Failed">Failed</option>
 					</select>
 				</div>
 				<div class="col-md-3">
@@ -183,10 +182,10 @@ function update_data_table(data) {
 
 function get_status_badge_class(status) {
 	switch(status) {
-		case 'New': return 'primary';
-		case 'In Progress': return 'warning';
-		case 'Completed': return 'success';
-		case 'Cancelled': return 'danger';
+		// case 'New': return 'primary';
+		case 'Pending': return 'warning';
+		case 'Successful': return 'success';
+		case 'Failed': return 'danger';
 		default: return 'secondary';
 	}
 }

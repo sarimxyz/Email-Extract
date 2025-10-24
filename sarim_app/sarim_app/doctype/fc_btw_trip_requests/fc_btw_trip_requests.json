@@ -5,8 +5,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_xrje",
-  "table_rtlw",
+  "trip_summary_tab",
   "section_break_iufs",
   "trip_name",
   "reporting_time",
@@ -24,7 +23,9 @@
   "mail_link",
   "email_message_body",
   "ai_token_usage",
-  "ai_json_response"
+  "ai_json_response",
+  "booking_details_tab",
+  "table_rtlw"
  ],
  "fields": [
   {
@@ -57,7 +58,7 @@
   {
    "fieldname": "vehicle_type",
    "fieldtype": "Data",
-   "label": "Vehicle Type"
+   "label": "RequiredVehicle Type"
   },
   {
    "fieldname": "city",
@@ -95,10 +96,6 @@
    "label": "Special Request"
   },
   {
-   "fieldname": "section_break_xrje",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "table_rtlw",
    "fieldtype": "Table",
    "options": "FC_TR_MultipleBooking_CT"
@@ -123,12 +120,22 @@
   {
    "fieldname": "section_break_iufs",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "trip_summary_tab",
+   "fieldtype": "Tab Break",
+   "label": "Trip Summary"
+  },
+  {
+   "fieldname": "booking_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Booking Details"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-23 16:54:06.030839",
+ "modified": "2025-10-24 15:34:38.262785",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
