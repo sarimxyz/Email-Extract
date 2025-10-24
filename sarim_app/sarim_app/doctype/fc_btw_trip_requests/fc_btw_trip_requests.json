@@ -6,20 +6,35 @@
  "engine": "InnoDB",
  "field_order": [
   "trip_summary_tab",
-  "section_break_iufs",
+  "trip_summary_section",
+  "summary",
+  "overall_trip_details_section",
   "trip_name",
   "reporting_time",
-  "vehicle_type",
   "city",
+  "column_break_jhlj",
+  "required_vehicle_type",
   "request_type",
   "duty_type",
-  "column_break_yckv",
+  "billing_details_section",
+  "billed_to_name",
+  "billed_to_number",
+  "billed_to_email",
+  "point_of_contact_section",
+  "poc_name",
+  "poc_number",
+  "poc_email",
+  "booking_details_section",
+  "booked_by_name",
+  "booked_by_email",
+  "booked_by_number",
+  "notes_and_special_requests_section",
   "notes",
   "remarks",
-  "column_break_wouh",
+  "column_break_ojtt",
   "special_request",
   "miscellaneous_requirements",
-  "column_break_nudj",
+  "email_details_and_ai_response_section",
   "mail_link",
   "email_message_body",
   "ai_token_usage",
@@ -56,11 +71,6 @@
    "label": "Reporting Time"
   },
   {
-   "fieldname": "vehicle_type",
-   "fieldtype": "Data",
-   "label": "RequiredVehicle Type"
-  },
-  {
    "fieldname": "city",
    "fieldtype": "Data",
    "label": "City"
@@ -81,11 +91,6 @@
    "label": "Notes"
   },
   {
-   "fieldname": "duty_type",
-   "fieldtype": "Data",
-   "label": "Duty Type"
-  },
-  {
    "fieldname": "request_type",
    "fieldtype": "Data",
    "label": "Request Type"
@@ -96,25 +101,9 @@
    "label": "Special Request"
   },
   {
-   "fieldname": "column_break_yckv",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_nudj",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "trip_name",
    "fieldtype": "Data",
    "label": "Trip Name"
-  },
-  {
-   "fieldname": "column_break_wouh",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_iufs",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "trip_summary_tab",
@@ -130,12 +119,114 @@
    "fieldname": "table_lftf",
    "fieldtype": "Table",
    "options": "FC_TR_MultipleBooking_CT"
+  },
+  {
+   "fieldname": "booked_by_name",
+   "fieldtype": "Data",
+   "label": "Booked By Name"
+  },
+  {
+   "fieldname": "booked_by_number",
+   "fieldtype": "Data",
+   "label": "Booked By Number"
+  },
+  {
+   "fieldname": "booked_by_email",
+   "fieldtype": "Data",
+   "label": "Booked By Email"
+  },
+  {
+   "fieldname": "billed_to_name",
+   "fieldtype": "Data",
+   "label": "Billed To Name"
+  },
+  {
+   "fieldname": "billed_to_number",
+   "fieldtype": "Data",
+   "label": "Billed To Number"
+  },
+  {
+   "fieldname": "billed_to_email",
+   "fieldtype": "Data",
+   "label": "Billed To Email"
+  },
+  {
+   "fieldname": "poc_name",
+   "fieldtype": "Data",
+   "label": "POC Name"
+  },
+  {
+   "fieldname": "poc_number",
+   "fieldtype": "Data",
+   "label": "POC Number"
+  },
+  {
+   "fieldname": "poc_email",
+   "fieldtype": "Data",
+   "label": "POC Email"
+  },
+  {
+   "fieldname": "notes_and_special_requests_section",
+   "fieldtype": "Section Break",
+   "label": "Notes And Special Requests"
+  },
+  {
+   "fieldname": "column_break_ojtt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "overall_trip_details_section",
+   "fieldtype": "Section Break",
+   "label": "Overall Trip Details And Summary"
+  },
+  {
+   "fieldname": "email_details_and_ai_response_section",
+   "fieldtype": "Section Break",
+   "label": "Email Details And Ai Response"
+  },
+  {
+   "fieldname": "booking_details_section",
+   "fieldtype": "Section Break",
+   "label": "Booking Details"
+  },
+  {
+   "fieldname": "point_of_contact_section",
+   "fieldtype": "Section Break",
+   "label": "Point Of Contact"
+  },
+  {
+   "fieldname": "billing_details_section",
+   "fieldtype": "Section Break",
+   "label": "Billing Details"
+  },
+  {
+   "fieldname": "column_break_jhlj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trip_summary_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Long Text",
+   "label": "Trip Summary"
+  },
+  {
+   "fieldname": "duty_type",
+   "fieldtype": "Data",
+   "label": "Duty Type"
+  },
+  {
+   "fieldname": "required_vehicle_type",
+   "fieldtype": "Data",
+   "label": "Required Vehicle Type"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-24 16:37:42.163068",
+ "modified": "2025-10-24 18:07:41.727959",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",

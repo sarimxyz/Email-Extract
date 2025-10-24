@@ -264,21 +264,32 @@ def process_received_emails_to_trip_requests():
                 trip = frappe.get_doc({
                     "doctype": "FC_BTW_Trip_Requests",
                     "trip_name":base_name,
-                    # "pickup_location": data.get("pickup_location") or "",
-                    # "drop_location": data.get("drop_location") or "",
-                    # "pickup_date": data.get("pickup_date") or "",
-                    # "pickup_time": data.get("pickup_time") or "",
-                    # "reporting_time": data.get("reporting_time") or "",
+                    "summary": data.get("summary") or "",
                     "vehicle_type": data.get("vehicle_type") or "",
                     "city": data.get("city") or "",
                     "miscellaneous_requirements": data.get("miscellaneous_requirements") or "",
-                    # "passenger_number": data.get("contact_number") or "",
-                    # "passenger_name": data.get("passenger_name") or "",
+                    
                     "duty_type":data.get("duty_type") or "",
                     "request_type":data.get("request_type") or "",
                     "special_request":data.get("special_request") or "",
                     "remarks":data.get("remarks") or "",
                     "notes":data.get("notes") or "",
+
+                    # Booked By contact details
+                    "booked_by_name": data.get("booked_by", {}).get("name") or "",
+                    "booked_by_email": data.get("booked_by", {}).get("email") or "",
+                    "booked_by_number": data.get("booked_by", {}).get("number") or "",
+                    
+                    # Billed To contact details
+                    "billed_to_name": data.get("billed_to", {}).get("name") or "",
+                    "billed_to_email": data.get("billed_to", {}).get("email") or "",
+                    "billed_to_number": data.get("billed_to", {}).get("number") or "",
+                    
+                    # Point of Contact details
+                    "poc_name": data.get("point_of_contact", {}).get("name") or "",
+                    "poc_email": data.get("point_of_contact", {}).get("email") or "",
+                    "poc_number": data.get("point_of_contact", {}).get("number") or "",
+
                     "mail_link": comm["name"],
                     "email_message_body": plain_text,
                     "ai_json_response": ai_output,
@@ -297,7 +308,9 @@ def process_received_emails_to_trip_requests():
                         "drop_location": b.get("drop_location") or "",
                         "pickup_date": b.get("pickup_date") or "",
                         "pickup_time": b.get("pickup_time") or "",
-                        "drop_time": b.get("drop_time") or ""
+                        "drop_time": b.get("drop_time") or "",
+                        "reporting_time": b.get("reporting_time") or "",
+                        "passenger_special_request": b.get("passenger_special_request") or ""
                     })
                 trip.insert()
                 frappe.db.commit()
