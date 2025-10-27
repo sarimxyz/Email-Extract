@@ -174,27 +174,121 @@ def process_received_emails_to_trip_requests():
     api_key = frappe.local.conf.get("anthropic_api_key")
     client = Anthropic(api_key=api_key)
 
-    # 2️⃣ Fetch all received emails with subject containing 'cab booking'
+    # # 2️⃣ Fetch all received emails with subject containing 'cab booking'
+    # communications = frappe.get_all(
+    #     "Communication",
+    #     filters={
+    #         "communication_type": "Communication",
+    #         "sent_or_received": "Received",
+    #         "subject": ["like", "%Fabcars App%"]
+    #     },
+    #     fields=["sender", "subject", "content", "creation", "name"]
+    # )
+
+    # for comm in communications:
+    #     # 3️⃣ Clean email HTML
+    #     plain_text = BeautifulSoup(comm["content"], "html.parser").get_text(separator="\n").strip()
+
+    #     exists = frappe.db.exists("FC_BTW_Extracted_Emails", {"source_email_id": comm["name"]})
+    #     if exists:
+    #         print(f"Email {comm['name']} already exists, skipping.")
+    #         continue
+
+    #     # 4️⃣ Add to FC_BTW_Extracted_Emails
+    #     try:
+    #         email_doc = frappe.get_doc({
+    #             "doctype": "FC_BTW_Extracted_Emails",
+    #             "source_email_id": comm["name"],
+    #             "sender": comm["sender"],
+    #             "subject": comm["subject"],
+    #             "message_body": plain_text,
+    #             "received_date": comm["creation"],
+    #             "communication_link": comm["name"]
+    #         })
+    #         email_doc.insert()
+    #         frappe.db.commit()
+    #         # print(f"Added email {comm['name']} to Extracted Emails")
+    #     except Exception as ex:
+    #         # print(f"Failed to add email {comm['name']}: {ex}")
+    #         continue
+        # 2️⃣ Fetch ALL received emails (NO SUBJECT FILTER)
     communications = frappe.get_all(
         "Communication",
         filters={
             "communication_type": "Communication",
-            "sent_or_received": "Received",
-            "subject": ["like", "%Fabcars App%"]
+            "sent_or_received": "Received"
         },
         fields=["sender", "subject", "content", "creation", "name"]
     )
 
     for comm in communications:
+
         # 3️⃣ Clean email HTML
         plain_text = BeautifulSoup(comm["content"], "html.parser").get_text(separator="\n").strip()
+        
+        # 4️⃣ Prepare email content (subject + body)
+        email_content = f"Subject: {comm['subject']}\n\n{plain_text}"
 
-        exists = frappe.db.exists("FC_BTW_Extracted_Emails", {"source_email_id": comm["name"]})
+        # 5️⃣ Check if already processed
+        exists = frappe.db.exists(
+        "FC_BTW_Extracted_Emails",
+        {"sender": comm["sender"], "subject": comm["subject"], "message_body": plain_text}
+        )
         if exists:
-            print(f"Email {comm['name']} already exists, skipping.")
             continue
 
-        # 4️⃣ Add to FC_BTW_Extracted_Emails
+        # 6️⃣ FIRST AI CALL: Check if this is a cab booking email
+        validation_prompt = f"""
+    You are an expert email classifier for identifying CAB / TAXI / VEHICLE BOOKING related emails.
+
+    Your job: Analyze the following email and decide if it is related to any CAB BOOKING, TAXI BOOKING, VEHICLE BOOKING, or TRAVEL REQUEST.
+
+    Email:
+    {email_content}
+
+    IMPORTANT RULES:
+    - Return ONLY a raw JSON object. No markdown, no text, no code blocks.
+    - Format:
+    {{"is_cab_booking": true or false, "reason": "short explanation"}}
+
+    CLASSIFY AS TRUE (cab booking) IF email contains **any** of the following:
+    - Mentions of cab, taxi, vehicle, car, trip, chauffeur, airport pickup/drop, etc.
+    - Passenger names, pickup/drop locations, travel date or time.
+    - Booking confirmation, request for cab, or trip details.
+    - Vendor or company sending cab booking confirmations.
+    - Attachments or booking details even if short.
+
+    CLASSIFY AS FALSE (not cab booking) IF:
+    - It's OTP, marketing, newsletter, or unrelated service mail.
+    - It’s about invoices, password resets, or welcome messages.
+
+    ⚠️ Even if the email looks partially like a booking (e.g., “Request for vehicle” or “trip details”), still mark TRUE.
+    Be lenient — better to classify possibly true than to miss one.
+
+    Return result strictly as JSON:
+    {{"is_cab_booking": true, "reason": "mentions pickup and drop details"}}
+    """
+
+        try:
+            validation_response = client.messages.create(
+                model="claude-4-sonnet-20250514",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": validation_prompt}]
+            )
+            validation_output = validation_response.content[0].text.strip()
+            frappe.log_error(f"AI Output for {comm['name']}: {validation_output}", "Cab Booking Debug")
+
+            validation_data = json.loads(validation_output)
+            
+            # ❌ If NOT a cab booking, skip this email completely
+            if not validation_data.get("is_cab_booking", False):
+                continue
+                
+        except Exception as e:
+            frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
+            continue
+
+        # 7️⃣ NOW create Extracted Email (only for valid bookings)
         try:
             email_doc = frappe.get_doc({
                 "doctype": "FC_BTW_Extracted_Emails",
@@ -207,11 +301,9 @@ def process_received_emails_to_trip_requests():
             })
             email_doc.insert()
             frappe.db.commit()
-            # print(f"Added email {comm['name']} to Extracted Emails")
         except Exception as ex:
-            # print(f"Failed to add email {comm['name']}: {ex}")
+            frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
             continue
-
         # Fetch prompt from Cab Settings
         cab_settings = frappe.get_single("FC_BTW_Cab_Settings")
         template_prompt = cab_settings.prompt
@@ -326,4 +418,4 @@ def process_received_emails_to_trip_requests():
                 email_doc.trip_request_error = str(ex)
                 email_doc.save()
                 frappe.db.commit()
-                print(f"Failed to create Trip Request for email {comm['name']}: {ex}")
+                # print(f"Failed to create Trip Request for email {comm['name']}: {ex}")
