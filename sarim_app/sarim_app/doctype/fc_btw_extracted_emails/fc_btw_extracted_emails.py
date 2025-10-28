@@ -25,6 +25,57 @@ class FC_BTW_Extracted_Emails(Document):
         # Final unique name
         self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
 
+def detect_missing_fields(data):
+    # Must-have passenger-level fields
+    REQUIRED_PASSENGER_FIELDS = ["passenger_name", "pickup_date", "pickup_location"]
+
+    # Optional but preferred passenger-level fields
+    # OPTIONAL_PASSENGER_FIELDS = ["passenger_number", "pickup_time", "reporting_time"]
+
+    # Must-have outer fields (top-level)
+    REQUIRED_TRIP_FIELDS = ["point_of_contact", "booked_by", "billed_to"]
+
+    missing = {
+        "bookings": [],   # per-passenger missing data
+        "trip_level": []  # top-level missing data
+    }
+
+    # --- Check passenger-level fields ---
+    bookings = data.get("bookings", [])
+    if isinstance(bookings, dict):
+        bookings = [bookings]
+
+    for idx, b in enumerate(bookings):
+        missing_fields = []
+
+        # required passenger fields
+        for f in REQUIRED_PASSENGER_FIELDS:
+            if not b.get(f):
+                missing_fields.append(f)
+
+        # number fallback logic (use POC number if no passenger number)
+        if not b.get("passenger_number"):
+            if not data.get("point_of_contact", {}).get("number"):
+                missing_fields.append("passenger_number")
+
+        # pickup_time/reporting_time fallback
+        if not b.get("pickup_time") and not b.get("reporting_time"):
+            missing_fields.append("pickup_time/reporting_time")
+
+        if missing_fields:
+            missing["bookings"].append({
+                "index": idx + 1,
+                "missing_fields": missing_fields
+            })
+
+    # --- Check outer fields ---
+    for f in REQUIRED_TRIP_FIELDS:
+        if not data.get(f) or not any(data[f].values()):
+            missing["trip_level"].append(f)
+
+    return missing
+
+
 def process_received_emails_to_trip_requests():
     """
     1. Fetch all received emails from Communication with subject 'cab booking'
@@ -145,6 +196,19 @@ def process_received_emails_to_trip_requests():
             prompt_tokens = response.usage.input_tokens
             completion_tokens = response.usage.output_tokens
             total_tokens = prompt_tokens + completion_tokens
+            try:
+                data = json.loads(ai_output)
+            except Exception as e:
+                frappe.log_error(f"JSON Parse Error for {comm['name']}: {str(e)}", "Cab Booking - JSON Error")
+                continue
+
+            missing_info = detect_missing_fields(data)
+            print(json.dumps(missing_info, indent=2))
+            is_partial = bool(missing_info["bookings"] or missing_info["trip_level"])
+            email_doc.is_partial_booking = 1 if is_partial else 0
+            email_doc.missing_fields = json.dumps(missing_info)
+            email_doc.save()
+            frappe.db.commit()
         except Exception as e:
             email_doc.trip_request_status = "Failed"
             email_doc.trip_request_error = f"Claude API call failed: {str(e)}"
@@ -177,6 +241,9 @@ def process_received_emails_to_trip_requests():
                     "doctype": "FC_BTW_Trip_Requests",
                     "trip_name":base_name,
                     "summary": data.get("summary") or "",
+                    "is_partial_booking": 1 if is_partial else 0,
+                    "missing_fields_json": json.dumps(missing_info),
+                    "overall_trip_status": "Partial" if is_partial else "Complete",
                     "required_vehicle_type": data.get("vehicle_type") or "",
                     "city": data.get("city") or "",
                     "miscellaneous_requirements": data.get("miscellaneous_requirements") or "",
@@ -207,8 +274,33 @@ def process_received_emails_to_trip_requests():
                 if isinstance(bookings, dict):  # safety for single object
                     bookings = [bookings]
 
-                for b in bookings:
+                # ✅ Generate booking numbers and add missing field tracking
+                for idx, b in enumerate(bookings):
+                    # Find missing fields for THIS specific booking
+                    booking_missing = []
+                    if missing_info["bookings"]:
+                        for missing_booking in missing_info["bookings"]:
+                            if missing_booking["index"] == idx + 1:
+                                booking_missing = missing_booking["missing_fields"]
+                                break
+                    
+                    # ✅ Generate globally unique booking number
+                    # Get last booking number from database
+                    last_booking = frappe.db.sql("""
+                        SELECT MAX(CAST(SUBSTRING_INDEX(SUBSTRING(booking_number, 2), '-', 1) AS UNSIGNED)) as max_num
+                        FROM `tabFC_TR_MultipleBooking_CT`
+                        WHERE booking_number LIKE '#%'
+                    """, as_dict=True)
+
+                    next_num = 1
+                    if last_booking and last_booking[0].get("max_num"):
+                        next_num = int(last_booking[0]["max_num"]) + 1
+
+                    # Add row index to make it guaranteed unique
+                    booking_number = f"#{next_num}R{idx + 1}"
+                    
                     trip.append("table_lftf", {
+                        "booking_number": booking_number, 
                         "passenger_name": b.get("passenger_name") or "",
                         "passenger_number": b.get("passenger_number") or "",
                         "pickup_location": b.get("pickup_location") or "",
@@ -217,10 +309,31 @@ def process_received_emails_to_trip_requests():
                         "pickup_time": b.get("pickup_time") or "",
                         "drop_time": b.get("drop_time") or "",
                         "reporting_time": b.get("reporting_time") or "",
-                        "passenger_specific_request": b.get("passenger_specific_request") or ""
+                        "passenger_specific_request": b.get("passenger_specific_request") or "",
+                        
+                        "booking_status": "Partial" if booking_missing else "Complete",
+                        "missing_fields_list": ", ".join(booking_missing) if booking_missing else ""
                     })
                 trip.insert()
                 frappe.db.commit()
+
+                trip.reload()
+                # ✅ Ensure missing fields reflect correctly inside the child table
+                for idx, row in enumerate(trip.table_lftf):
+                    booking_missing = []
+                    for missing_booking in missing_info.get("bookings", []):
+                        if missing_booking.get("index") == idx + 1:
+                            booking_missing = missing_booking.get("missing_fields", [])
+                            break
+
+                    # Update fields for this row
+                    row.missing_fields_list = ", ".join(booking_missing) if booking_missing else ""
+                    row.booking_status = "Partial" if booking_missing else "Complete"
+
+                # ✅ Save trip again to persist child-level updates
+                trip.save(ignore_permissions=True)
+                frappe.db.commit()
+                print("✅ Updated missing fields list for child table:", [r.missing_fields_list for r in trip.table_lftf])
 
                 # ✅ Update Extracted Email
                 email_doc.trip_request_status = "Successful"

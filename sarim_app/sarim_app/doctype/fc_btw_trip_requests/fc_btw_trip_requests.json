@@ -8,6 +8,9 @@
   "trip_summary_tab",
   "trip_summary_section",
   "summary",
+  "is_partial_booking",
+  "overall_trip_status",
+  "missing_fields",
   "overall_trip_details_section",
   "trip_name",
   "reporting_time",
@@ -221,12 +224,29 @@
    "fieldname": "required_vehicle_type",
    "fieldtype": "Data",
    "label": "Required Vehicle Type"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_partial_booking",
+   "fieldtype": "Check",
+   "label": "Is Partial Booking"
+  },
+  {
+   "fieldname": "missing_fields",
+   "fieldtype": "Long Text",
+   "label": "Missing Fields"
+  },
+  {
+   "fieldname": "overall_trip_status",
+   "fieldtype": "Select",
+   "label": "Overall Trip Status",
+   "options": "Partial\nComplete"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-24 18:07:41.727959",
+ "modified": "2025-10-28 17:06:43.750572",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",

@@ -6,6 +6,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "booking_number",
+  "booking_status",
   "passenger_name",
   "passenger_number",
   "pickup_location",
@@ -14,7 +16,8 @@
   "pickup_time",
   "drop_time",
   "reporting_time",
-  "passenger_special_request"
+  "passenger_special_request",
+  "missing_field_lists"
  ],
  "fields": [
   {
@@ -61,13 +64,29 @@
    "fieldname": "passenger_special_request",
    "fieldtype": "Data",
    "label": "Passenger Specific Requests"
+  },
+  {
+   "fieldname": "booking_number",
+   "fieldtype": "Data",
+   "label": "Booking Number"
+  },
+  {
+   "fieldname": "booking_status",
+   "fieldtype": "Select",
+   "label": "Booking Status",
+   "options": "Partial\nPending Reply\nComplete"
+  },
+  {
+   "fieldname": "missing_field_lists",
+   "fieldtype": "Small Text",
+   "label": "Missing Fields List"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-27 15:39:46.197605",
+ "modified": "2025-10-28 16:28:04.451095",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_TR_MultipleBooking_CT",

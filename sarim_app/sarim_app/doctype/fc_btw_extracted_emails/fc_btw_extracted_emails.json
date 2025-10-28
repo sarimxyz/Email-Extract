@@ -14,7 +14,9 @@
   "communication_link",
   "trip_request_status",
   "trip_request_error",
-  "source_email_id"
+  "source_email_id",
+  "is_partial_booking",
+  "missing_fields"
  ],
  "fields": [
   {
@@ -69,12 +71,23 @@
    "fieldname": "number_of_bookings",
    "fieldtype": "Int",
    "label": "Number of Bookings"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_partial_booking",
+   "fieldtype": "Check",
+   "label": "is Partial Booking"
+  },
+  {
+   "fieldname": "missing_fields",
+   "fieldtype": "Long Text",
+   "label": "Missing Fields"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-21 15:36:30.467513",
+ "modified": "2025-10-28 13:47:16.255081",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Extracted_Emails",
