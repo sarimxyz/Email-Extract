@@ -12,7 +12,9 @@
   "drop_location",
   "pickup_date",
   "pickup_time",
-  "drop_time"
+  "drop_time",
+  "reporting_time",
+  "passenger_special_request"
  ],
  "fields": [
   {
@@ -49,13 +51,23 @@
    "fieldname": "pickup_date",
    "fieldtype": "Data",
    "label": "Pickup Date"
+  },
+  {
+   "fieldname": "reporting_time",
+   "fieldtype": "Data",
+   "label": "Reporting Time"
+  },
+  {
+   "fieldname": "passenger_special_request",
+   "fieldtype": "Data",
+   "label": "Passenger Specific Requests"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-22 11:20:58.158440",
+ "modified": "2025-10-27 15:39:46.197605",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_TR_MultipleBooking_CT",
