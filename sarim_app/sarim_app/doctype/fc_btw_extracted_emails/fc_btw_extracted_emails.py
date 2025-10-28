@@ -151,15 +151,26 @@ from anthropic import Anthropic
 import json
 
 class FC_BTW_Extracted_Emails(Document):
-    def autoname(self):
+     def autoname(self):
         """
-        Naming: sender_dd-mm-yyyy_HH-MM-SS
+        Naming pattern:
+        sender_dd-mm-yyyy_HH-MM AM/PM
+        If duplicate, add suffix (_2, _3, etc.)
         """
-        
-        sender = self.sender or "unknown"
-        # keep sender as-is
-        timestamp = self.received_date.strftime("%d-%m-%Y_%I-%M %p")  # 12-hour format with AM/PM
-        self.name = f"{sender}_{timestamp}"
+
+        sender = (self.sender or "unknown").strip()
+        timestamp = self.received_date.strftime("%d-%m-%Y_%I-%M %p")
+
+        base_name = f"{sender}_{timestamp}"
+
+        # Count existing with same base prefix
+        existing_count = frappe.db.count(
+            "FC_BTW_Extracted_Emails",
+            {"name": ["like", f"{base_name}%"]}
+        )
+
+        # Final unique name
+        self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
 
 
 def process_received_emails_to_trip_requests():
@@ -268,42 +279,76 @@ def process_received_emails_to_trip_requests():
     Return result strictly as JSON:
     {{"is_cab_booking": true, "reason": "mentions pickup and drop details"}}
     """
-
         try:
-            validation_response = client.messages.create(
-                model="claude-4-sonnet-20250514",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": validation_prompt}]
-            )
-            validation_output = validation_response.content[0].text.strip()
-            frappe.log_error(f"AI Output for {comm['name']}: {validation_output}", "Cab Booking Debug")
-
-            validation_data = json.loads(validation_output)
-            
-            # ❌ If NOT a cab booking, skip this email completely
-            if not validation_data.get("is_cab_booking", False):
-                continue
-                
+                validation_response = client.messages.create(
+                    model="claude-4-sonnet-20250514",
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": validation_prompt}]
+                )
+                validation_output = validation_response.content[0].text.strip()
+                print(validation_output)
+                validation_data = json.loads(validation_output)
+                if not validation_data.get("is_cab_booking", False):
+                    continue
         except Exception as e:
-            frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
-            continue
+                frappe.log_error(f"AI Validation Error for {comm['name']}: {str(e)}", "Cab Booking - Validation Error")
+                continue
 
-        # 7️⃣ NOW create Extracted Email (only for valid bookings)
+            # 7️⃣ Create Extracted Email (move this outside that try)
         try:
-            email_doc = frappe.get_doc({
-                "doctype": "FC_BTW_Extracted_Emails",
-                "source_email_id": comm["name"],
-                "sender": comm["sender"],
-                "subject": comm["subject"],
-                "message_body": plain_text,
-                "received_date": comm["creation"],
-                "communication_link": comm["name"]
-            })
-            email_doc.insert()
-            frappe.db.commit()
+                email_doc = frappe.get_doc({
+                    "doctype": "FC_BTW_Extracted_Emails",
+                    "source_email_id": comm["name"],
+                    "sender": comm["sender"],
+                    "subject": comm["subject"],
+                    "message_body": plain_text,
+                    "received_date": comm["creation"],
+                    "communication_link": comm["name"]
+                })
+                email_doc.insert()
+                frappe.db.commit()
+                print(f"✅ Created extracted email: {comm['name']}")
         except Exception as ex:
-            frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
-            continue
+                frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
+                print(f"❌ Failed to create extracted email {comm['name']}: {str(ex)}")
+                continue
+        # try:
+        #     validation_response = client.messages.create(
+        #         model="claude-4-sonnet-20250514",
+        #         max_tokens=1024,
+        #         messages=[{"role": "user", "content": validation_prompt}]
+        #     )
+        #     validation_output = validation_response.content[0].text.strip()
+        #     print(validation_output)
+
+        #     frappe.log_error(f"AI Output for {comm['name']}: {validation_output}", "Cab Booking Debug")
+
+        #     validation_data = json.loads(validation_output)
+            
+        #     # ❌ If NOT a cab booking, skip this email completely
+        #     if not validation_data.get("is_cab_booking", False):
+        #         continue
+                
+        # except Exception as e:
+        #     print("Failed to create extracted email ")# frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
+        #     continue
+
+        # # 7️⃣ NOW create Extracted Email (only for valid bookings)
+        # try:
+        #     email_doc = frappe.get_doc({
+        #         "doctype": "FC_BTW_Extracted_Emails",
+        #         "source_email_id": comm["name"],
+        #         "sender": comm["sender"],
+        #         "subject": comm["subject"],
+        #         "message_body": plain_text,
+        #         "received_date": comm["creation"],
+        #         "communication_link": comm["name"]
+        #     })
+        #     email_doc.insert()
+        #     frappe.db.commit()
+        # except Exception as ex:
+        #     frappe.log_error(f"Failed to create extracted email {comm['name']}: {str(ex)}", "Cab Booking - Insert Error")
+        #     continue
         # Fetch prompt from Cab Settings
         cab_settings = frappe.get_single("FC_BTW_Cab_Settings")
         template_prompt = cab_settings.prompt
@@ -357,7 +402,7 @@ def process_received_emails_to_trip_requests():
                     "doctype": "FC_BTW_Trip_Requests",
                     "trip_name":base_name,
                     "summary": data.get("summary") or "",
-                    "vehicle_type": data.get("vehicle_type") or "",
+                    "required_vehicle_type": data.get("vehicle_type") or "",
                     "city": data.get("city") or "",
                     "miscellaneous_requirements": data.get("miscellaneous_requirements") or "",
                     
@@ -402,7 +447,7 @@ def process_received_emails_to_trip_requests():
                         "pickup_time": b.get("pickup_time") or "",
                         "drop_time": b.get("drop_time") or "",
                         "reporting_time": b.get("reporting_time") or "",
-                        "passenger_special_request": b.get("passenger_special_request") or ""
+                        "passenger_specific_request": b.get("passenger_specific_request") or ""
                     })
                 trip.insert()
                 frappe.db.commit()
