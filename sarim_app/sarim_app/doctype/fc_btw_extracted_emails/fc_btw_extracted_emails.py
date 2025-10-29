@@ -3,6 +3,9 @@ import frappe
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
 import json
+from sarim_app.sarim_app.services.booking_filter import prefilter_booking_email
+from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fields
+
 
 class FC_BTW_Extracted_Emails(Document):
      def autoname(self):
@@ -24,56 +27,6 @@ class FC_BTW_Extracted_Emails(Document):
 
         # Final unique name
         self.name = base_name if existing_count == 0 else f"{base_name}_{existing_count + 1}"
-
-def detect_missing_fields(data):
-    # Must-have passenger-level fields
-    REQUIRED_PASSENGER_FIELDS = ["passenger_name", "pickup_date", "pickup_location"]
-
-    # Optional but preferred passenger-level fields
-    # OPTIONAL_PASSENGER_FIELDS = ["passenger_number", "pickup_time", "reporting_time"]
-
-    # Must-have outer fields (top-level)
-    REQUIRED_TRIP_FIELDS = ["point_of_contact", "booked_by", "billed_to"]
-
-    missing = {
-        "bookings": [],   # per-passenger missing data
-        "trip_level": []  # top-level missing data
-    }
-
-    # --- Check passenger-level fields ---
-    bookings = data.get("bookings", [])
-    if isinstance(bookings, dict):
-        bookings = [bookings]
-
-    for idx, b in enumerate(bookings):
-        missing_fields = []
-
-        # required passenger fields
-        for f in REQUIRED_PASSENGER_FIELDS:
-            if not b.get(f):
-                missing_fields.append(f)
-
-        # number fallback logic (use POC number if no passenger number)
-        if not b.get("passenger_number"):
-            if not data.get("point_of_contact", {}).get("number"):
-                missing_fields.append("passenger_number")
-
-        # pickup_time/reporting_time fallback
-        if not b.get("pickup_time") and not b.get("reporting_time"):
-            missing_fields.append("pickup_time/reporting_time")
-
-        if missing_fields:
-            missing["bookings"].append({
-                "index": idx + 1,
-                "missing_fields": missing_fields
-            })
-
-    # --- Check outer fields ---
-    for f in REQUIRED_TRIP_FIELDS:
-        if not data.get(f) or not any(data[f].values()):
-            missing["trip_level"].append(f)
-
-    return missing
 
 
 def process_received_emails_to_trip_requests():
@@ -102,8 +55,8 @@ def process_received_emails_to_trip_requests():
         # 3️⃣ Clean email HTML
         plain_text = BeautifulSoup(comm["content"], "html.parser").get_text(separator="\n").strip()
         
-        # 4️⃣ Prepare email content (subject + body)
-        email_content = f"Subject: {comm['subject']}\n\n{plain_text}"
+        # # 4️⃣ Prepare email content (subject + body)
+        # email_content = f"Subject: {comm['subject']}\n\n{plain_text}"
 
         # 5️⃣ Check if already processed
         exists = frappe.db.exists(
@@ -114,50 +67,55 @@ def process_received_emails_to_trip_requests():
             continue
 
         # 6️⃣ FIRST AI CALL: Check if this is a cab booking email
-        validation_prompt = f"""
-    You are an expert email classifier for identifying CAB / TAXI / VEHICLE BOOKING related emails.
+    #     validation_prompt = f"""
+    # You are an expert email classifier for identifying CAB / TAXI / VEHICLE BOOKING related emails.
 
-    Your job: Analyze the following email and decide if it is related to any CAB BOOKING, TAXI BOOKING, VEHICLE BOOKING, or TRAVEL REQUEST.
+    # Your job: Analyze the following email and decide if it is related to any CAB BOOKING, TAXI BOOKING, VEHICLE BOOKING, or TRAVEL REQUEST.
 
-    Email:
-    {email_content}
+    # Email:
+    # {email_content}
 
-    IMPORTANT RULES:
-    - Return ONLY a raw JSON object. No markdown, no text, no code blocks.
-    - Format:
-    {{"is_cab_booking": true or false, "reason": "short explanation"}}
+    # IMPORTANT RULES:
+    # - Return ONLY a raw JSON object. No markdown, no text, no code blocks.
+    # - Format:
+    # {{"is_cab_booking": true or false, "reason": "short explanation"}}
 
-    CLASSIFY AS TRUE (cab booking) IF email contains **any** of the following:
-    - Mentions of cab, taxi, vehicle, car, trip, chauffeur, airport pickup/drop, etc.
-    - Passenger names, pickup/drop locations, travel date or time.
-    - Booking confirmation, request for cab, or trip details.
-    - Vendor or company sending cab booking confirmations.
-    - Attachments or booking details even if short.
+    # CLASSIFY AS TRUE (cab booking) IF email contains **any** of the following:
+    # - Mentions of cab, taxi, vehicle, car, trip, chauffeur, airport pickup/drop, etc.
+    # - Passenger names, pickup/drop locations, travel date or time.
+    # - Booking confirmation, request for cab, or trip details.
+    # - Vendor or company sending cab booking confirmations.
+    # - Attachments or booking details even if short.
 
-    CLASSIFY AS FALSE (not cab booking) IF:
-    - It's OTP, marketing, newsletter, or unrelated service mail.
-    - It's about invoices, password resets, or welcome messages.
+    # CLASSIFY AS FALSE (not cab booking) IF:
+    # - It's OTP, marketing, newsletter, or unrelated service mail.
+    # - It's about invoices, password resets, or welcome messages.
 
-    Even if the email looks partially like a booking (e.g., “Request for vehicle” or “trip details”), still mark TRUE.
-    Be lenient — better to classify possibly true than to miss one.
+    # Even if the email looks partially like a booking (e.g., “Request for vehicle” or “trip details”), still mark TRUE.
+    # Be lenient — better to classify possibly true than to miss one.
 
-    Return result strictly as JSON:
-    {{"is_cab_booking": true, "reason": "mentions pickup and drop details"}}
-    """
-        try:
-                validation_response = client.messages.create(
-                    model="claude-4-sonnet-20250514",
-                    max_tokens=1024,
-                    messages=[{"role": "user", "content": validation_prompt}]
-                )
-                validation_output = validation_response.content[0].text.strip()
-                print(validation_output)
-                validation_data = json.loads(validation_output)
-                if not validation_data.get("is_cab_booking", False):
-                    continue
-        except Exception as e:
-                frappe.log_error(f"AI Validation Error for {comm['name']}: {str(e)}", "Cab Booking - Validation Error")
-                continue
+    # Return result strictly as JSON:
+    # {{"is_cab_booking": true, "reason": "mentions pickup and drop details"}}
+    # """
+    #     try:
+    #             validation_response = client.messages.create(
+    #                 model="claude-4-sonnet-20250514",
+    #                 max_tokens=1024,
+    #                 messages=[{"role": "user", "content": validation_prompt}]
+    #             )
+    #             validation_output = validation_response.content[0].text.strip()
+    #             print(validation_output)
+    #             validation_data = json.loads(validation_output)
+    #             if not validation_data.get("is_cab_booking", False):
+    #                 continue
+        # except Exception as e:
+        #         frappe.log_error(f"AI Validation Error for {comm['name']}: {str(e)}", "Cab Booking - Validation Error")
+        #         continue
+        prefilter_result = prefilter_booking_email(comm["subject"], plain_text)
+
+        if not prefilter_result["is_likely_booking"]:
+            print(f"❌ Skipped non-booking mail: {prefilter_result['reason']}")
+            continue  # skip Claude API call
 
             # 7️⃣ Create Extracted Email
         try:
