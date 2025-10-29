@@ -7,8 +7,8 @@ def prefilter_booking_email(subject, body):
     text = (subject + " " + body).lower()
 
     # ✅ Keyword sets
-    partial_keywords = ['book', 'cab', 'pickup', 'drop',"report"]
-    exact_keywords = ['ride', 'trip', 'vehicle', 'driver', 'itinerary', 'reservation', 'confirmed',"passenger","employee"]
+    partial_keywords = ['book', 'cab', 'pickup', 'drop']
+    exact_keywords = ['ride', 'trip', 'vehicle', 'driver', 'itinerary', 'reservation', 'confirmed']
 
     keyword_hits = 0
 
