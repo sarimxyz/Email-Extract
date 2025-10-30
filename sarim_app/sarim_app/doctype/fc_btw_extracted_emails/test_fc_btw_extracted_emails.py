@@ -88,3 +88,114 @@ class TestFC_BTW_Extracted_Emails(FrappeTestCase):
         # except Exception as e:
         #     frappe.log_error(f"API Error for {comm['name']}: {str(e)}", "Cab Booking - API Error")
         #     continue
+
+
+# STEP 1️⃣ - Email bhejne se PEHLE Communication record banao
+# ==========================================
+# comm = frappe.new_doc("Communication")
+# comm.communication_type = "Communication"  # "Email" nahi, "Communication" use karo
+# comm.communication_medium = "Email"
+# comm.sent_or_received = "Sent"
+# comm.recipients = "sarimk360@gmail.com"
+# comm.subject = "Test Email"
+# comm.content = "Hello, this is a test email from Frappe!"
+# comm.status = "Sent"
+# comm.insert(ignore_permissions=True)
+# frappe.db.commit()
+
+# # ==========================================
+# # STEP 2️⃣ - Ab email bhejo aur Message-ID track karo
+# # ==========================================
+# frappe.sendmail(
+#     recipients=["sarimk360@gmail.com"],
+#     subject=comm.subject,
+#     message=comm.content,
+#     delayed=False,
+#     reference_doctype="Communication",
+#     reference_name=comm.name,
+#     now=True  # 👈 ensures email bhejte hi record update ho
+# )
+
+# frappe.db.commit()
+
+# # Communication record reload karo taaki updated message_id mil sake
+# comm.reload()
+# print(f"✅ Sent mail saved as: {comm.name}")
+# print(f"📬 Message ID captured: {comm.message_id if comm.message_id else '❌ None (SMTP didn’t return Message-ID)'}")
+
+# # ==========================================
+# # STEP 3️⃣ - Recent outgoing mails dekh lo (confirmation)
+# # ==========================================
+# outgoing = frappe.get_all(
+#     "Communication",
+#     filters={"sent_or_received": "Sent"},
+#     fields=["name", "subject", "message_id", "creation"],
+#     order_by="creation desc",
+#     limit=3
+# )
+
+# print("\n📤 Outgoing Emails:")
+# for o in outgoing:
+#     print(f" - {o.name} | Subject: {o.subject} | Message ID: {o.message_id}")
+
+# # ==========================================
+# # STEP 4️⃣ - Recent incoming mails check karo (reply aaye kya)
+# # ==========================================
+# incoming = frappe.get_all(
+#     "Communication",
+#     filters={"sent_or_received": "Received"},
+#     fields=["name", "subject", "in_reply_to", "message_id", "creation"],
+#     order_by="creation desc",
+#     limit=5
+# )
+
+# print("\n📥 Incoming Emails:")
+# for c in incoming:
+#     print(f" - {c.name} | Subject: {c.subject}")
+#     print(f"   In-Reply-To: {c.in_reply_to}")
+#     print(f"   Message ID: {c.message_id}\n")
+
+# # ==========================================
+# # STEP 5️⃣ - Final summary
+# # ==========================================
+# sent_comm = frappe.get_all(
+#     "Communication",
+#     filters={"sent_or_received": "Sent"},
+#     fields=["name", "message_id", "subject"],
+#     order_by="creation desc",
+#     limit=1
+# )[0]
+
+# print(f"📦 Latest Sent Message-ID: {sent_comm.message_id}")
+
+# replies = frappe.get_all(
+#     "Communication",
+#     filters={
+#         "reference_doctype": "Communication",
+#         "reference_name": comm.name,
+#         "sent_or_received": "Received"
+#     },
+#     fields=["name", "sender", "subject", "creation", "content"]
+# )
+# comm = frappe.get_all(
+#     "Communication",
+#     filters={
+#         "sent_or_received": "Sent",
+#         "subject": "Test Email"
+#     },
+#     fields=["name", "reference_doctype", "reference_name"],
+#     order_by="creation desc",
+#     limit=1
+# )[0]
+# parent_trip = frappe.db.get_value(
+#     "Communication",
+#     comm["name"],
+#     ["reference_doctype", "reference_name"],
+#     as_dict=True
+# )
+
+# if parent_trip and parent_trip.reference_doctype == "Trip Request":
+#     trip_request_name = parent_trip.reference_name
+#     print(f"📎 Linking reply to Trip Request {trip_request_name}")
+# else:
+#     print("❌ No Trip Request linked to this outgoing mail.")
