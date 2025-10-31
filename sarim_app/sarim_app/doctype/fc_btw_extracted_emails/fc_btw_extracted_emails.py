@@ -7,6 +7,76 @@ import re
 from sarim_app.sarim_app.services.booking_filter import prefilter_booking_email
 from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fields
 
+# Build an HTML + plain text body listing the booking row and missing fields
+def build_missing_info_email_body(trip, row):
+    # row is a child row doc (table_lftf)
+    missing_list = row.missing_fields_list or ""
+    html = f"""
+    <p>Hello,</p>
+    <p>We are missing details for booking <b>{row.booking_number}</b> in Trip <b>{trip.name}</b>.</p>
+    <p><b>Passenger:</b> {row.passenger_name or ''} <br>
+       <b>Missing fields:</b> {missing_list or 'None'}</p>
+    <p>Please reply to this same email (do NOT create a new email) with the missing details for booking <b>{row.booking_number}</b>.
+       Your reply will be auto-applied to the booking row.</p>
+    <hr>
+    <small>Reference: TR-{trip.name} | Booking: {row.booking_number}</small>
+    """
+    # plain text fallback
+    text = f"""Hello,
+
+We are missing details for booking {row.booking_number} in Trip {trip.name}.
+
+Passenger: {row.passenger_name or ''}
+Missing fields: {missing_list or 'None'}
+
+Please reply to this same email (do NOT create a new email) with the missing details for booking {row.booking_number}.
+Your reply will be auto-applied to the booking row.
+
+Reference: TR-{trip.name} | Booking: {row.booking_number}
+"""
+    return html, text
+
+# Send single mail per booking row, linked to Trip Request
+def send_missing_info_mail_for_row(trip, row):
+    html_body, text_body = build_missing_info_email_body(trip, row)
+    subject = f"Trip Request Update - {trip.name} | Booking: {row.booking_number}"
+    # Use reference_doctype pointing to Trip Request so replies get linked
+    try:
+        frappe.sendmail(
+            recipients=[trip.poc_email or trip.booked_by_email],
+            subject=subject,
+            message=html_body,
+            delayed=False,
+            reference_doctype="FC_BTW_Trip_Requests",
+            reference_name=trip.name,
+            now=True
+        )
+        frappe.db.commit()
+        frappe.msgprint(f"Sent missing-info mail for {row.booking_number} -> {trip.name}")
+        frappe.logger().info(f"Sent missing-info mail: {subject} -> {trip.name}")
+        return True
+    except Exception as e:
+        frappe.log_error(f"Failed to send missing mail for {trip.name} {row.booking_number}: {str(e)}", "Missing Mail Send Error")
+        return False
+
+# Helper to extract booking_number from subject - robust for common patterns
+# def extract_booking_from_subject(subject):
+
+
+def extract_booking_from_subject(subject):
+    if not subject:
+        return None
+
+    # exact match for: <email>_<DD-MM-YYYY>_<HH-MM> <AM|PM>-R<number>
+    pattern = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}\s(?:AM|PM)-R\d+"
+
+    m = re.search(pattern, subject)
+    if m:
+        return m.group(0).strip()
+
+    return None
+
+
 
 class FC_BTW_Extracted_Emails(Document):
      def autoname(self):
@@ -270,7 +340,7 @@ def process_received_emails_to_trip_requests():
                     # also keep track to update parent trip_request
                     if booking_missing:
                         updated_missing.append({
-                            "booking_number": row.booking_number,
+                            # "booking_number": row.booking_number,
                             "missing_fields_list": booking_missing
                         })
 
@@ -283,50 +353,29 @@ def process_received_emails_to_trip_requests():
                 email_doc.is_partial_booking = 1 if updated_missing else 0
                 email_doc.save(ignore_permissions=True)
 
-                trip.save(ignore_permissions=True)
-                frappe.db.commit()
+                # trip.save(ignore_permissions=True)
+                # frappe.db.commit()
 
-                print("✅ Final missing fields updated per booking_number:", 
-                    [f"{r.booking_number}: {r.missing_fields_list}" for r in trip.table_lftf])
-
-                                # 📨 Send individual missing fields emails per booking
+                # ▶ Send missing-info mail for each partial booking row
                 try:
-                    if updated_missing:
-                        for missing in updated_missing:
-                            booking_num = missing.get("booking_number")
-                            fields_list = ", ".join(missing.get("missing_fields_list", [])) if isinstance(missing.get("missing_fields_list"), list) else missing.get("missing_fields_list")
+                    partial_rows = [r for r in trip.table_lftf if (r.booking_status == "Partial" or (r.missing_fields_list and r.missing_fields_list.strip()))]
+                    if partial_rows:
+                        print(f"📨 Sending missing-info mails for {len(partial_rows)} partial booking(s)")
+                    for row in partial_rows:
+                        sent_ok = send_missing_info_mail_for_row(trip, row)
+                        # optionally store last_sent_comm link in child row (if you want to track Communication.name)
+                        # you can fetch last sent communication to this trip & subject below, if needed.
+                        if sent_ok:
+                            # mark we attempted sending (useful to avoid re-sending duplicates)
+                            row.db_set("missing_mail_sent", 1)  # add this field if not present in child table (boolean)
+                    # Commit final state
+                    trip.save(ignore_permissions=True)
+                    frappe.db.commit()
+                except Exception as e:
+                    frappe.log_error(f"Failed while sending missing mails for trip {trip.name}: {str(e)}", "Missing Mail Send Error")
+                    print("Failed to send missing mails:", str(e))
 
-                            html_body = f"""
-                            <p>Dear {trip.booked_by_name or 'Customer'},</p>
-                            <p>We’ve created your trip request <b>{trip.trip_name}</b>.</p>
-                            <p>For booking <b>{booking_num}</b>, the following details are missing:</p>
-                            <ul>
-                                {''.join([f"<li>{field}</li>" for field in fields_list.split(', ')])}
-                            </ul>
-                            <p>Please reply to this email with the missing details. Our system will automatically update your booking.</p>
-                            <br>
-                            <p>Thank you,<br>Cab Booking Team</p>
-                            """
-
-                            recipient_email = (
-                                trip.booked_by_email
-                                or trip.poc_email
-                                or trip.billed_to_email
-                                or "support@example.com"
-                            )
-
-                            frappe.sendmail(
-                                recipients=[recipient_email],
-                                subject=f"Missing Details for Booking {booking_num}",
-                                message=html_body
-                            )
-
-                            print(f"📧 Sent missing fields email for {booking_num} → {recipient_email}")
-
-                except Exception as mail_err:
-                    frappe.log_error(f"Missing Fields Email Error: {str(mail_err)}", "Cab Booking - Missing Fields Mail")
-                    print(f"❌ Failed to send missing field emails: {str(mail_err)}")
-
+                # process_replies_for_trip(trip)
 
                 # ✅ Update Extracted Email
                 email_doc.trip_request_status = "Successful"
@@ -340,82 +389,176 @@ def process_received_emails_to_trip_requests():
                 email_doc.save()
                 frappe.db.commit()
 
-        # 🧩 Step 9: Auto-update missing Trip Request fields from replies
-        try:
-            replies = frappe.get_all(
-                "Communication",
-                filters={
-                    "reference_doctype": "Communication",
-                    "reference_name": comm["name"],
-                    "sent_or_received": "Received"
-                },
-                fields=["name", "subject", "content", "creation"]
-            )
+def process_replies_for_all_trips():
+    """Process all trips with partial booking automatically (scheduler entrypoint)."""
+    trips = frappe.get_all(
+        "FC_BTW_Trip_Requests",
+        filters={"is_partial_booking": 1},
+        fields=["name"]
+    )
+    print("Trips found:", trips)
 
-            if replies:
-                print(f"📨 Found {len(replies)} reply(s) for {comm['name']}")
+    if not trips:
+        frappe.logger().info("🚫 No pending partial trips found.")
+        return
 
-            for reply in replies:
-                reply_text = BeautifulSoup(reply["content"], "html.parser").get_text(separator="\n").strip()
+    for t in trips:
+        trip = frappe.get_doc("FC_BTW_Trip_Requests", t.name)
+        process_replies_for_trip(trip)
 
-                prefilter_reply = prefilter_booking_email(reply["subject"], reply_text)
-                if not prefilter_reply["is_likely_booking"]:
-                    print(f"↪️ Skipping irrelevant reply: {reply['subject']}")
-                    continue
 
-                reply_context = f"""
-                Sender: {reply['sender']}
-                Subject: {reply['subject']}
+def process_replies_for_trip(trip):
+    """Update trip child rows based on received mail replies."""
+    try:
+        # get received replies linked to this Trip Request
+        replies = frappe.get_all(
+            "Communication",
+            filters={
+                "sent_or_received": "Received",
+                "reference_doctype": "FC_BTW_Trip_Requests",
+                "reference_name": trip.name
+            },
+            fields=["name", "subject", "sender", "content", "in_reply_to", "creation"],
+            order_by="creation desc"
+        )
 
-                Body:
-                {reply_text}
-                """
-                reply_prompt = template_prompt.replace("{email_text}", reply_context)
+        if not replies:
+            frappe.logger().info(f"📭 No replies for Trip {trip.name}")
+            return
 
-                response = client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=2048,
-                    messages=[{"role": "user", "content": reply_prompt}]
+        for r in replies:
+            # comm_doc = frappe.get_doc("Communication", r["name"])
+            reply_subject = r.get("subject") or ""
+            reply_content = BeautifulSoup(r.get("content") or "", "html.parser").get_text("\n").strip()
+
+            # --- 1️⃣ Identify booking number ---
+            booking_number = extract_booking_from_subject(reply_subject)
+            # if not booking_number:
+            #     m = re.search(r"Booking[:\s]*([A-Za-z0-9@._%+\-]+-R\d+)", reply_content, flags=re.IGNORECASE)
+            #     if m:
+            #         booking_number = m.group(1).strip()
+
+            if not booking_number:
+                frappe.log_error(
+                    f"Reply {r['name']} couldn't be mapped to booking (no booking number): {reply_subject}",
+                    "Reply Mapping Failed"
                 )
-                reply_output = response.content[0].text.strip()
-                reply_output = re.sub(r"^```(json)?", "", reply_output)
-                reply_output = re.sub(r"```$", "", reply_output).strip()
+                continue
 
-                try:
-                    reply_data = json.loads(reply_output)
-                except Exception as e:
-                    frappe.log_error(f"Reply JSON parse failed for {reply['name']}: {str(e)}", "Cab Booking Reply Error")
-                    continue
+            # --- 2️⃣ Find corresponding booking row ---
+            trip.reload()
+            found_row = next((row for row in trip.table_lftf if row.booking_number == booking_number), None)
 
-                updated = False
-                for idx, row in enumerate(trip.table_lftf):
-                    booking = None
-                    for b in reply_data.get("bookings", []):
-                        if (
-                            b.get("passenger_name") == row.passenger_name
-                            or b.get("booking_number") == row.booking_number
-                        ):
-                            booking = b
-                            break
+            if not found_row:
+                frappe.log_error(
+                    f"Reply {r['name']} maps to booking {booking_number} but no child row found in {trip.name}",
+                    "Reply Mapping Failed"
+                )
+                continue
 
-                    if not booking:
-                        continue
+            # --- 3️⃣ Extract fields from reply ---
+            reply_data = extract_fields_from_reply(reply_content)
 
-                    fields_to_update = [
-                        "pickup_location", "drop_location", "pickup_date", "pickup_time",
-                        "drop_time", "reporting_time", "passenger_number"
-                    ]
-                    for f in fields_to_update:
-                        val = booking.get(f)
-                        if val and not row.get(f):
-                            row.set(f, val)
-                            updated = True
+            # --- 4️⃣ Update only missing fields ---
+            updated = False
+            fields_to_update = [
+                "passenger_name","passenger_number", "pickup_location", "drop_location",
+                "pickup_date", "pickup_time", "reporting_time"
+            ]
 
-                if updated:
-                    trip.save(ignore_permissions=True)
-                    frappe.db.commit()
-                    print(f"✅ Trip {trip.name} updated with details from reply {reply['name']}")
+            for f in fields_to_update:
+                val = reply_data.get(f)
+                if val and not getattr(found_row, f):
+                    found_row.set(f, val)
+                    updated = True
 
-        except Exception as e:
-            frappe.log_error(f"Reply update failed for {comm['name']}: {str(e)}", "Cab Booking - Reply Update")
-            print(f"❌ Reply update failed: {str(e)}")  
+            # --- 5️⃣ Re-evaluate missing fields for this row ---
+            mini_bookings = [{
+                "booking_number": found_row.booking_number,
+                "passenger_name": found_row.passenger_name,
+                "passenger_number": found_row.passenger_number,
+                "pickup_location": found_row.pickup_location,
+                "drop_location": found_row.drop_location,
+                "pickup_date": found_row.pickup_date,
+                "pickup_time": found_row.pickup_time,
+                "reporting_time": found_row.reporting_time
+            }]
+
+            final_missing = detect_missing_fields({"bookings": mini_bookings})
+            missing_for_row = []
+            for mb in final_missing.get("bookings", []):
+                if mb.get("booking_number") == found_row.booking_number:
+                    missing_for_row = mb.get("missing_fields", [])
+                    break
+
+            found_row.missing_fields_list = ", ".join(missing_for_row) if missing_for_row else ""
+            found_row.booking_status = "Partial" if missing_for_row else "Complete"
+
+            # --- Save after row update ---
+            if updated or True:
+                trip.save(ignore_permissions=True)
+                frappe.db.commit()
+                frappe.logger().info(f"✅ Updated trip {trip.name} booking {found_row.booking_number} from reply {r['name']}")
+
+        # --- 6️⃣ Update overall trip-level status ---
+        trip.reload()
+        any_partial = any(
+            r.booking_status == "Partial" or (r.missing_fields_list and r.missing_fields_list.strip())
+            for r in trip.table_lftf
+        )
+
+        trip.is_partial_booking = 1 if any_partial else 0
+        trip.overall_trip_status = "Partial" if any_partial else "Complete"
+        trip.save(ignore_permissions=True)
+        frappe.db.commit()
+        trip.reload()
+        # --- 7️⃣ Sync linked Extracted Email doc (if exists) ---
+        try:
+            ee = frappe.get_all(
+                "FC_BTW_Extracted_Emails",
+                filters={"communication_link": trip.mail_link},
+                fields=["name"],
+                limit=1
+            )
+            if ee:
+                ee_doc = frappe.get_doc("FC_BTW_Extracted_Emails", ee[0]["name"])
+                ee_doc.is_partial_booking = trip.is_partial_booking
+                ee_doc.overall_trip_status = trip.overall_trip_status
+                ee_doc.save(ignore_permissions=True)
+                frappe.db.commit()
+        except Exception:
+            pass
+
+    except Exception as e:
+        frappe.log_error(f"process_replies_for_trip failed for {trip.name}: {str(e)}", "Reply Processing Error")
+
+def extract_fields_from_reply(reply_content):
+    """Extracts common fields from reply using regex (extend with AI later)."""
+    
+    reply_data = {}
+
+    m_name = re.search(r"(?:name|passenger|mr\.?|ms\.?|mrs\.?)\s*[:\-]?\s*([a-zA-Z\s]+?)(?:\n|$|,|\s{2,}|\d)", reply_content, re.I)
+    if m_name:
+        reply_data["passenger_name"] = m_name.group(1).strip()
+
+    m_phone = re.search(r"(\+?\d{7,15})", reply_content)
+    if m_phone:
+        reply_data["passenger_number"] = m_phone.group(1)
+
+    m_pickup = re.search(r"(pickup|pick up|start point|from)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
+    if m_pickup:
+        reply_data["pickup_location"] = m_pickup.group(3).strip()
+
+    m_drop = re.search(r"(drop|destination|to)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
+    if m_drop:
+        reply_data["drop_location"] = m_drop.group(3).strip()
+
+    m_pickup_date = re.search(r"(pickup|journey|travel)\s*(date|on|:|-)?\s*([^\n]+)", reply_content, re.I)
+    if m_pickup_date:
+        reply_data["pickup_date"] = m_pickup_date.group(3).strip()
+
+    m_pickup_time = re.search(r"(pickup|reporting)\s*(time|at|:|-)?\s*([^\n]+)", reply_content, re.I)
+    if m_pickup_time:
+        reply_data["pickup_time"] = m_pickup_time.group(3).strip()
+
+    return reply_data

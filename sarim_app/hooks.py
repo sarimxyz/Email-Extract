@@ -173,7 +173,7 @@ app_license = "mit"
 # scheduler_events = {
 #     "cron": {
 #         "* * * * *": [
-#             "sarim_app.sarim_app.doctype.fc_btw_extracted_emails.fc_btw_extracted_emails.process_received_emails_to_trip_requests"
+#             "sarim_app.sarim_app.doctype.fc_btw_extracted_emails.fc_btw_extracted_emails.process_replies_for_all_trips"
 #         ]
 #     }
 # }
