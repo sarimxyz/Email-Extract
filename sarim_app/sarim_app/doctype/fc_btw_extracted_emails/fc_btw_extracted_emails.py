@@ -8,56 +8,136 @@ from sarim_app.sarim_app.services.booking_filter import prefilter_booking_email
 from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fields
 
 # Build an HTML + plain text body listing the booking row and missing fields
+# def build_missing_info_email_body(trip, row):
+#     # row is a child row doc (table_lftf)
+#     missing_list = row.missing_fields_list or ""
+#     html = f"""
+#     <p>Hello,</p>
+#     <p>We are missing details for booking <b>{row.booking_number}</b> in Trip <b>{trip.name}</b>.</p>
+#     <p><b>Passenger:</b> {row.passenger_name or ''} <br>
+#        <b>Missing fields:</b> {missing_list or 'None'}</p>
+#     <p>Please reply to this same email (do NOT create a new email) with the missing details for booking <b>{row.booking_number}</b>.
+#        Your reply will be auto-applied to the booking row.</p>
+#     <hr>
+#     <small>Reference: TR-{trip.name} | Booking: {row.booking_number}</small>
+#     """
+#     # plain text fallback
+#     text = f"""Hello,
+
+# We are missing details for booking {row.booking_number} in Trip {trip.name}.
+
+# Passenger: {row.passenger_name or ''}
+# Missing fields: {missing_list or 'None'}
+
+# Please reply to this same email (do NOT create a new email) with the missing details for booking {row.booking_number}.
+# Your reply will be auto-applied to the booking row.
+
+# Reference: TR-{trip.name} | Booking: {row.booking_number}
+# """
+#     return html, text
 def build_missing_info_email_body(trip, row):
-    # row is a child row doc (table_lftf)
-    missing_list = row.missing_fields_list or ""
+    missing = row.missing_fields_list or "None"
+
     html = f"""
     <p>Hello,</p>
-    <p>We are missing details for booking <b>{row.booking_number}</b> in Trip <b>{trip.name}</b>.</p>
-    <p><b>Passenger:</b> {row.passenger_name or ''} <br>
-       <b>Missing fields:</b> {missing_list or 'None'}</p>
-    <p>Please reply to this same email (do NOT create a new email) with the missing details for booking <b>{row.booking_number}</b>.
-       Your reply will be auto-applied to the booking row.</p>
+
+    <p>We need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
+
+    <p><b>Current details we have:</b></p>
+
+    <ul>
+        <li><b>Passenger:</b> {row.passenger_name or '-'}
+        <li><b>Phone:</b> {row.passenger_number or '-'}
+        <li><b>Pickup:</b> {row.pickup_location or '-'}
+        <li><b>Drop:</b> {row.drop_location or '-'}
+        <li><b>Date:</b> {row.pickup_date or '-'}
+        <li><b>Time:</b> {row.pickup_time or '-'}
+        <li><b>Reporting Time:</b> {row.reporting_time or '-'}
+    </ul>
+
+    <p><b>Missing:</b> {missing}</p>
+
+    <p>Please reply to this same email (do NOT start a new email) with corrected/missing details.</p>
+
+    <p>Example reply style:<br>
+    <code>Pickup Location: New Town<br>Time: 6:30 AM</code></p>
+
     <hr>
     <small>Reference: TR-{trip.name} | Booking: {row.booking_number}</small>
     """
-    # plain text fallback
-    text = f"""Hello,
 
-We are missing details for booking {row.booking_number} in Trip {trip.name}.
+    text = f"""
+Hello,
 
-Passenger: {row.passenger_name or ''}
-Missing fields: {missing_list or 'None'}
+We need some remaining details for booking {row.booking_number} under Trip {trip.name}.
 
-Please reply to this same email (do NOT create a new email) with the missing details for booking {row.booking_number}.
-Your reply will be auto-applied to the booking row.
+Current info:
+Passenger: {row.passenger_name or '-'}
+Phone: {row.passenger_number or '-'}
+Pickup: {row.pickup_location or '-'}
+Drop: {row.drop_location or '-'}
+Date: {row.pickup_date or '-'}
+Time: {row.pickup_time or '-'}
+Reporting Time: {row.reporting_time or '-'}
+
+Missing: {missing}
+
+Reply to this same email only with corrected/missing fields.
+Example:
+Pickup Location: New Town
+Time: 6:30 AM
 
 Reference: TR-{trip.name} | Booking: {row.booking_number}
 """
     return html, text
 
 # Send single mail per booking row, linked to Trip Request
+# def send_missing_info_mail_for_row(trip, row):
+#     html_body, text_body = build_missing_info_email_body(trip, row)
+#     subject = f"Trip Request Update - {trip.name} | Booking: {row.booking_number}"
+#     # Use reference_doctype pointing to Trip Request so replies get linked
+#     try:
+#         frappe.sendmail(
+#             recipients=[trip.poc_email or trip.booked_by_email],
+#             subject=subject,
+#             message=html_body,
+#             delayed=False,
+#             reference_doctype="FC_BTW_Trip_Requests",
+#             reference_name=trip.name,
+#             now=True
+#         )
+#         frappe.db.commit()
+#         frappe.msgprint(f"Sent missing-info mail for {row.booking_number} -> {trip.name}")
+#         frappe.logger().info(f"Sent missing-info mail: {subject} -> {trip.name}")
+#         return True
+#     except Exception as e:
+#         frappe.log_error(f"Failed to send missing mail for {trip.name} {row.booking_number}: {str(e)}", "Missing Mail Send Error")
+#         return False
 def send_missing_info_mail_for_row(trip, row):
-    html_body, text_body = build_missing_info_email_body(trip, row)
+    html, text = build_missing_info_email_body(trip, row)
     subject = f"Trip Request Update - {trip.name} | Booking: {row.booking_number}"
-    # Use reference_doctype pointing to Trip Request so replies get linked
+
     try:
         frappe.sendmail(
             recipients=[trip.poc_email or trip.booked_by_email],
             subject=subject,
-            message=html_body,
-            delayed=False,
+            message=html,
             reference_doctype="FC_BTW_Trip_Requests",
             reference_name=trip.name,
-            now=True
+            delayed=False
         )
+
         frappe.db.commit()
-        frappe.msgprint(f"Sent missing-info mail for {row.booking_number} -> {trip.name}")
-        frappe.logger().info(f"Sent missing-info mail: {subject} -> {trip.name}")
+        frappe.logger().info(f"📩 Missing info mail sent: {subject}")
         return True
+
     except Exception as e:
-        frappe.log_error(f"Failed to send missing mail for {trip.name} {row.booking_number}: {str(e)}", "Missing Mail Send Error")
+        frappe.log_error(
+            f"Send mail failed for {trip.name} / {row.booking_number}: {str(e)}",
+            "Missing Mail Error"
+        )
         return False
+
 
 # Helper to extract booking_number from subject - robust for common patterns
 # def extract_booking_from_subject(subject):
@@ -120,14 +200,18 @@ def process_received_emails_to_trip_requests():
             "sent_or_received": "Received"
         },
         fields=["sender", "subject", "content", "creation", "name"],
-        limit=15
+        limit=20
     )
 
     for comm in communications:
 
         # 3️⃣ Clean email HTML
         plain_text = BeautifulSoup(comm["content"], "html.parser").get_text(separator="\n").strip()
-
+          # ✅ Skip reply emails — they should NOT come to booking extractor
+        subject = (comm.get("subject") or "").lower()
+        if subject.startswith("re:") or comm.get("in_reply_to"):
+            print(f"↩️ Reply skipped from booking pipeline: {comm.get('name')}")
+            continue
         # 5️⃣ Check if already processed
         exists = frappe.db.exists("FC_BTW_Extracted_Emails", {"source_email_id": comm["name"]})
 
@@ -532,33 +616,98 @@ def process_replies_for_trip(trip):
     except Exception as e:
         frappe.log_error(f"process_replies_for_trip failed for {trip.name}: {str(e)}", "Reply Processing Error")
 
-def extract_fields_from_reply(reply_content):
-    """Extracts common fields from reply using regex (extend with AI later)."""
+# def extract_fields_from_reply(reply_content):
+#     """Extracts common fields from reply using regex (extend with AI later)."""
     
-    reply_data = {}
+#     reply_data = {}
 
-    m_name = re.search(r"(?:name|passenger|mr\.?|ms\.?|mrs\.?)\s*[:\-]?\s*([a-zA-Z\s]+?)(?:\n|$|,|\s{2,}|\d)", reply_content, re.I)
-    if m_name:
-        reply_data["passenger_name"] = m_name.group(1).strip()
+#     # m_name = re.search(r"(?:name|passenger|mr\.?|ms\.?|mrs\.?)\s*[:\-]?\s*([a-zA-Z\s]+?)(?:\n|$|,|\s{2,}|\d)", reply_content, re.I)
+#     # if m_name:
+#     #     reply_data["passenger_name"] = m_name.group(1).strip()
 
-    m_phone = re.search(r"(\+?\d{7,15})", reply_content)
-    if m_phone:
-        reply_data["passenger_number"] = m_phone.group(1)
+#     m_name = re.search(r"(?:name|passenger)\s*[:=]\s*([a-zA-Z\s]+)", reply_content, re.I)
+#     if m_name:
+#         reply_data["passenger_name"] = m_name.group(1).strip()
 
-    m_pickup = re.search(r"(pickup|pick up|start point|from)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
-    if m_pickup:
-        reply_data["pickup_location"] = m_pickup.group(3).strip()
 
-    m_drop = re.search(r"(drop|destination|to)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
-    if m_drop:
-        reply_data["drop_location"] = m_drop.group(3).strip()
+#     m_phone = re.search(r"(\+?\d{7,15})", reply_content)
+#     if m_phone:
+#         reply_data["passenger_number"] = m_phone.group(1)
 
-    m_pickup_date = re.search(r"(pickup|journey|travel)\s*(date|on|:|-)?\s*([^\n]+)", reply_content, re.I)
-    if m_pickup_date:
-        reply_data["pickup_date"] = m_pickup_date.group(3).strip()
+#     m_pickup = re.search(r"(pickup|pick up|start point|from)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
+#     if m_pickup:
+#         reply_data["pickup_location"] = m_pickup.group(3).strip()
 
-    m_pickup_time = re.search(r"(pickup|reporting)\s*(time|at|:|-)?\s*([^\n]+)", reply_content, re.I)
-    if m_pickup_time:
-        reply_data["pickup_time"] = m_pickup_time.group(3).strip()
+#     m_drop = re.search(r"(drop|destination|to)\s*(location|point|:|-)?\s*([^\n]+)", reply_content, re.I)
+#     if m_drop:
+#         reply_data["drop_location"] = m_drop.group(3).strip()
 
-    return reply_data
+#     m_pickup_date = re.search(r"(pickup|journey|travel)\s*(date|on|:|-)?\s*([^\n]+)", reply_content, re.I)
+#     if m_pickup_date:
+#         reply_data["pickup_date"] = m_pickup_date.group(3).strip()
+
+#     m_pickup_time = re.search(r"(pickup|reporting)\s*(time|at|:|-)?\s*([^\n]+)", reply_content, re.I)
+#     if m_pickup_time:
+#         reply_data["pickup_time"] = m_pickup_time.group(3).strip()
+
+#     return reply_data
+
+def extract_fields_from_reply(reply_content):
+    """
+    AI-only field extractor — returns dict with only fields relevant
+    to your booking update logic. No regex.
+    """
+
+    prompt = f"""
+You extract booking details from user email replies.
+Return JSON only. Missing fields = null.
+
+Required keys:
+- passenger_name
+- passenger_number
+- pickup_location
+- drop_location
+- pickup_date
+- pickup_time
+- reporting_time
+
+Strict Output Format:
+{{
+ "passenger_name": "...",
+ "passenger_number": "...",
+ "pickup_location": "...",
+ "drop_location": "...",
+ "pickup_date": "...",
+ "pickup_time": "...",
+ "reporting_time": "..."
+}}
+
+User reply:
+\"\"\"{reply_content}\"\"\"
+    """
+    api_key = frappe.local.conf.get("anthropic_api_key")
+    client = Anthropic(api_key=api_key)
+    try:
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = response.content[0].text.strip()
+
+        # When model adds explanation wrapper, isolate JSON
+        if not raw.startswith("{"):
+            raw = raw[raw.find("{") : raw.rfind("}") + 1]
+
+        data = json.loads(raw)
+
+        # safety: ensure all keys exist
+        for k in ["passenger_name","passenger_number","pickup_location","drop_location",
+                  "pickup_date","pickup_time","reporting_time"]:
+            data.setdefault(k, None)
+
+        return data
+    except Exception as e:
+        frappe.log_error(f"AI parse failed: {e}", "Trip Reply Extractor")
+        return {}
