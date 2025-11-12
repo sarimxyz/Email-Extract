@@ -7,15 +7,15 @@
  "field_order": [
   "trip_summary_tab",
   "trip_summary_section",
-  "summary",
   "is_partial_booking",
-  "overall_trip_status",
   "missing_fields",
   "overall_trip_details_section",
   "trip_name",
-  "reporting_time",
-  "city",
+  "summary",
   "column_break_jhlj",
+  "overall_trip_status",
+  "city",
+  "reporting_time",
   "required_vehicle_type",
   "request_type",
   "duty_type",
@@ -61,11 +61,13 @@
    "columns": 2,
    "fieldname": "ai_json_response",
    "fieldtype": "Code",
+   "hidden": 1,
    "label": "AI JSON Response"
   },
   {
    "fieldname": "ai_token_usage",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Ai Token Usage"
   },
   {
@@ -185,7 +187,7 @@
   {
    "fieldname": "email_details_and_ai_response_section",
    "fieldtype": "Section Break",
-   "label": "Email Details And Ai Response"
+   "label": "Email Details"
   },
   {
    "fieldname": "booking_details_section",
@@ -229,11 +231,13 @@
    "default": "0",
    "fieldname": "is_partial_booking",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Is Partial Booking"
   },
   {
    "fieldname": "missing_fields",
    "fieldtype": "Long Text",
+   "hidden": 1,
    "label": "Missing Fields"
   },
   {
@@ -246,7 +250,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-28 17:06:43.750572",
+ "modified": "2025-11-12 13:20:59.989180",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",

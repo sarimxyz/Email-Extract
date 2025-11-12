@@ -54,6 +54,7 @@
   {
    "fieldname": "trip_request_error",
    "fieldtype": "Long Text",
+   "hidden": 1,
    "label": "Trip Request Error"
   },
   {
@@ -81,13 +82,14 @@
   {
    "fieldname": "missing_fields",
    "fieldtype": "Long Text",
+   "hidden": 1,
    "label": "Missing Fields"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-28 13:47:16.255081",
+ "modified": "2025-11-12 13:17:01.851234",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Extracted_Emails",

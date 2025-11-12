@@ -35,13 +35,34 @@ from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fi
 # Reference: TR-{trip.name} | Booking: {row.booking_number}
 # """
 #     return html, text
+def format_missing_fields_readable(missing_info):
+    """
+    Convert {"bookings": [{"missing_fields_list": [...]}, ...]} 
+    into readable multi-line string for users.
+    """
+    if not missing_info or "bookings" not in missing_info:
+        return "All bookings complete ✅"
+
+    lines = []
+    for idx, b in enumerate(missing_info.get("bookings", []), start=1):
+        fields = b.get("missing_fields_list", [])
+        if isinstance(fields, list):
+            fields = ", ".join(fields)
+        elif isinstance(fields, str):
+            # in case stored as string already
+            fields = fields.strip()
+        fields = fields if fields else "None (Complete)"
+        lines.append(f"Booking {idx} → {fields}")
+    return "\n".join(lines)
 def build_missing_info_email_body(trip, row):
     missing = row.missing_fields_list or "None"
 
     html = f"""
     <p>Hello,</p>
 
-    <p>We need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
+    <p>Thank you for contacting us. We appreciate your prompt communication regarding your booking.</p>
+
+    <p>We still need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
 
     <p><b>Current details we have:</b></p>
 
@@ -57,39 +78,97 @@ def build_missing_info_email_body(trip, row):
 
     <p><b>Missing:</b> {missing}</p>
 
-    <p>Please reply to this same email (do NOT start a new email) with corrected/missing details.</p>
+    <p>Please reply to this same email (do NOT start a new thread) with the missing or corrected details.</p>
 
-    <p>Example reply style:<br>
+    <p>Example reply format:<br>
     <code>Pickup Location: New Town<br>Time: 6:30 AM</code></p>
 
     <hr>
     <small>Reference: TR-{trip.name} | Booking: {row.booking_number}</small>
     """
+    return html
+#     text = f"""
+# Hello,
 
-    text = f"""
-Hello,
+# Thank you for contacting us. We appreciate your prompt communication regarding your booking.
 
-We need some remaining details for booking {row.booking_number} under Trip {trip.name}.
+# We still need a few details for booking {row.booking_number} under Trip {trip.name}.
 
-Current info:
-Passenger: {row.passenger_name or '-'}
-Phone: {row.passenger_number or '-'}
-Pickup: {row.pickup_location or '-'}
-Drop: {row.drop_location or '-'}
-Date: {row.pickup_date or '-'}
-Time: {row.pickup_time or '-'}
-Reporting Time: {row.reporting_time or '-'}
+# Current info:
+# Passenger: {row.passenger_name or '-'}
+# Phone: {row.passenger_number or '-'}
+# Pickup: {row.pickup_location or '-'}
+# Drop: {row.drop_location or '-'}
+# Date: {row.pickup_date or '-'}
+# Time: {row.pickup_time or '-'}
+# Reporting Time: {row.reporting_time or '-'}
 
-Missing: {missing}
+# Missing: {missing}
 
-Reply to this same email only with corrected/missing fields.
-Example:
-Pickup Location: New Town
-Time: 6:30 AM
+# Please reply to this same email only with corrected/missing fields.
+# Example:
+# Pickup Location: New Town
+# Time: 6:30 AM
 
-Reference: TR-{trip.name} | Booking: {row.booking_number}
-"""
-    return html, text
+# Reference: TR-{trip.name} | Booking: {row.booking_number}
+# """
+    
+
+# def build_missing_info_email_body(trip, row):
+#     missing = row.missing_fields_list or "None"
+
+#     html = f"""
+#     <p>Hello,</p>
+
+#     <p>We need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
+
+#     <p><b>Current details we have:</b></p>
+
+#     <ul>
+#         <li><b>Passenger:</b> {row.passenger_name or '-'}
+#         <li><b>Phone:</b> {row.passenger_number or '-'}
+#         <li><b>Pickup:</b> {row.pickup_location or '-'}
+#         <li><b>Drop:</b> {row.drop_location or '-'}
+#         <li><b>Date:</b> {row.pickup_date or '-'}
+#         <li><b>Time:</b> {row.pickup_time or '-'}
+#         <li><b>Reporting Time:</b> {row.reporting_time or '-'}
+#     </ul>
+
+#     <p><b>Missing:</b> {missing}</p>
+
+#     <p>Please reply to this same email (do NOT start a new email) with corrected/missing details.</p>
+
+#     <p>Example reply style:<br>
+#     <code>Pickup Location: New Town<br>Time: 6:30 AM</code></p>
+
+#     <hr>
+#     <small>Reference: TR-{trip.name} | Booking: {row.booking_number}</small>
+#     """
+
+#     text = f"""
+# Hello,
+
+# We need some remaining details for booking {row.booking_number} under Trip {trip.name}.
+
+# Current info:
+# Passenger: {row.passenger_name or '-'}
+# Phone: {row.passenger_number or '-'}
+# Pickup: {row.pickup_location or '-'}
+# Drop: {row.drop_location or '-'}
+# Date: {row.pickup_date or '-'}
+# Time: {row.pickup_time or '-'}
+# Reporting Time: {row.reporting_time or '-'}
+
+# Missing: {missing}
+
+# Reply to this same email only with corrected/missing fields.
+# Example:
+# Pickup Location: New Town
+# Time: 6:30 AM
+
+# Reference: TR-{trip.name} | Booking: {row.booking_number}
+# """
+#     return html, text
 
 # Send single mail per booking row, linked to Trip Request
 # def send_missing_info_mail_for_row(trip, row):
@@ -114,7 +193,7 @@ Reference: TR-{trip.name} | Booking: {row.booking_number}
 #         frappe.log_error(f"Failed to send missing mail for {trip.name} {row.booking_number}: {str(e)}", "Missing Mail Send Error")
 #         return False
 def send_missing_info_mail_for_row(trip, row):
-    html, text = build_missing_info_email_body(trip, row)
+    html = build_missing_info_email_body(trip, row)
     subject = f"Trip Request Update - {trip.name} | Booking: {row.booking_number}"
 
     try:
@@ -429,14 +508,27 @@ def process_received_emails_to_trip_requests():
                         })
 
                 # ✅ Update the main trip doc’s missing_fields and overall status
-                trip.missing_fields = json.dumps({"bookings": updated_missing})
+                # trip.missing_fields = json.dumps({"bookings": updated_missing})
+                # trip.is_partial_booking = 1 if updated_missing else 0
+                # trip.overall_trip_status = "Partial" if updated_missing else "Complete"
+
+                # email_doc.missing_fields = json.dumps({"bookings": updated_missing})
+                # email_doc.is_partial_booking = 1 if updated_missing else 0
+                # email_doc.save(ignore_permissions=True)
+                readable_missing = format_missing_fields_readable({"bookings": updated_missing})
+
+                # ✅ Update the main trip doc’s missing_fields and overall status
+                trip.missing_fields = readable_missing
                 trip.is_partial_booking = 1 if updated_missing else 0
                 trip.overall_trip_status = "Partial" if updated_missing else "Complete"
+                trip.save(ignore_permissions=True)
+                frappe.db.commit()
 
-                email_doc.missing_fields = json.dumps({"bookings": updated_missing})
-                email_doc.is_partial_booking = 1 if updated_missing else 0
+                # ✅ Sync the Extracted Email doc too
+                email_doc.missing_fields = readable_missing
+                email_doc.is_partial_booking = trip.is_partial_booking
                 email_doc.save(ignore_permissions=True)
-
+                frappe.db.commit()
                 # trip.save(ignore_permissions=True)
                 # frappe.db.commit()
 
