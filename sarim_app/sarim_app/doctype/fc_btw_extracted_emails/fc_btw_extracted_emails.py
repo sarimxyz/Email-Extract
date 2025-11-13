@@ -60,7 +60,7 @@ def build_missing_info_email_body(trip, row):
     html = f"""
     <p>Hello,</p>
 
-    <p>Thank you for contacting us. We appreciate your prompt communication regarding your booking.</p>
+    <p>Thank you for contacting us.</p>
 
     <p>We still need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
 
@@ -279,7 +279,7 @@ def process_received_emails_to_trip_requests():
             "sent_or_received": "Received"
         },
         fields=["sender", "subject", "content", "creation", "name"],
-        limit=20
+        limit=30
     )
 
     for comm in communications:
@@ -470,7 +470,8 @@ def process_received_emails_to_trip_requests():
                         "drop_time": b.get("drop_time") or "",
                         "reporting_time": b.get("reporting_time") or "",
                         "passenger_specific_request": b.get("passenger_specific_request") or "",
-                        
+                        "custom_city": b.get("custom_city") or "",
+                        "custom_vehicle_type": b.get("custom_vehicle_type") or "",
                         "booking_status": "Partial" if booking_missing else "Complete",
                         "missing_fields_list": ", ".join(booking_missing) if booking_missing else ""
                     })

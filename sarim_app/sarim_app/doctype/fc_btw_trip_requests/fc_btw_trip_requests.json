@@ -10,15 +10,16 @@
   "is_partial_booking",
   "missing_fields",
   "overall_trip_details_section",
-  "trip_name",
-  "summary",
   "column_break_jhlj",
+  "trip_name",
   "overall_trip_status",
   "city",
   "reporting_time",
   "required_vehicle_type",
   "request_type",
   "duty_type",
+  "column_break_xomz",
+  "summary",
   "billing_details_section",
   "billed_to_name",
   "billed_to_number",
@@ -78,6 +79,7 @@
   {
    "fieldname": "city",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "City"
   },
   {
@@ -225,6 +227,7 @@
   {
    "fieldname": "required_vehicle_type",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Required Vehicle Type"
   },
   {
@@ -245,12 +248,16 @@
    "fieldtype": "Select",
    "label": "Overall Trip Status",
    "options": "Partial\nComplete"
+  },
+  {
+   "fieldname": "column_break_xomz",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-12 13:20:59.989180",
+ "modified": "2025-11-13 12:09:41.802800",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",
