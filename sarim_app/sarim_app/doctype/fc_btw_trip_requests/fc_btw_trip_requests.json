@@ -6,20 +6,21 @@
  "engine": "InnoDB",
  "field_order": [
   "trip_summary_tab",
-  "trip_summary_section",
-  "is_partial_booking",
-  "missing_fields",
   "overall_trip_details_section",
   "column_break_jhlj",
   "trip_name",
-  "overall_trip_status",
-  "city",
-  "reporting_time",
-  "required_vehicle_type",
-  "request_type",
-  "duty_type",
-  "column_break_xomz",
   "summary",
+  "column_break_xomz",
+  "duty_type",
+  "reporting_time",
+  "request_type",
+  "overall_trip_status",
+  "notes_and_special_requests_section",
+  "notes",
+  "remarks",
+  "column_break_ojtt",
+  "special_request",
+  "miscellaneous_requirements",
   "billing_details_section",
   "billed_to_name",
   "billed_to_number",
@@ -32,12 +33,6 @@
   "booked_by_name",
   "booked_by_email",
   "booked_by_number",
-  "notes_and_special_requests_section",
-  "notes",
-  "remarks",
-  "column_break_ojtt",
-  "special_request",
-  "miscellaneous_requirements",
   "email_details_and_ai_response_section",
   "mail_link",
   "email_message_body",
@@ -75,12 +70,6 @@
    "fieldname": "reporting_time",
    "fieldtype": "Data",
    "label": "Reporting Time"
-  },
-  {
-   "fieldname": "city",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "City"
   },
   {
    "fieldname": "miscellaneous_requirements",
@@ -183,8 +172,7 @@
   },
   {
    "fieldname": "overall_trip_details_section",
-   "fieldtype": "Section Break",
-   "label": "Overall Trip Details And Summary"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "email_details_and_ai_response_section",
@@ -211,37 +199,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "trip_summary_section",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "summary",
-   "fieldtype": "Long Text",
+   "fieldtype": "Small Text",
    "label": "Trip Summary"
   },
   {
    "fieldname": "duty_type",
    "fieldtype": "Data",
    "label": "Duty Type"
-  },
-  {
-   "fieldname": "required_vehicle_type",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Required Vehicle Type"
-  },
-  {
-   "default": "0",
-   "fieldname": "is_partial_booking",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "Is Partial Booking"
-  },
-  {
-   "fieldname": "missing_fields",
-   "fieldtype": "Long Text",
-   "hidden": 1,
-   "label": "Missing Fields"
   },
   {
    "fieldname": "overall_trip_status",
@@ -257,7 +222,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-13 12:09:41.802800",
+ "modified": "2026-02-10 12:36:48.752455",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Trip_Requests",

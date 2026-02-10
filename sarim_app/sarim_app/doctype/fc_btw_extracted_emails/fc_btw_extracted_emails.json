@@ -6,17 +6,19 @@
  "engine": "InnoDB",
  "field_order": [
   "sender",
+  "received_date",
   "subject",
   "has_multiple_bookings",
   "number_of_bookings",
-  "message_body",
-  "received_date",
-  "communication_link",
-  "trip_request_status",
-  "trip_request_error",
-  "source_email_id",
   "is_partial_booking",
-  "missing_fields"
+  "trip_request_status",
+  "source_email_id",
+  "missing_fields",
+  "column_break_uabm",
+  "message_body",
+  "communication_link",
+  "trip_request_link",
+  "trip_request_error"
  ],
  "fields": [
   {
@@ -60,6 +62,7 @@
   {
    "fieldname": "source_email_id",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Source Email Id"
   },
   {
@@ -84,12 +87,22 @@
    "fieldtype": "Long Text",
    "hidden": 1,
    "label": "Missing Fields"
+  },
+  {
+   "fieldname": "column_break_uabm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trip_request_link",
+   "fieldtype": "Link",
+   "label": "Trip Request Link",
+   "options": "FC_BTW_Trip_Requests"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-12 13:17:01.851234",
+ "modified": "2026-02-10 12:14:05.910001",
  "modified_by": "Administrator",
  "module": "Sarim App",
  "name": "FC_BTW_Extracted_Emails",

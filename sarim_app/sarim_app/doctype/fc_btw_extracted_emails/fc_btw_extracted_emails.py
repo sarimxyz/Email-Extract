@@ -7,6 +7,29 @@ import re
 from sarim_app.sarim_app.services.booking_filter import prefilter_booking_email
 from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fields
 
+MISSING_FIELD_LABELS = {
+    "passenger_name": "Passenger Name",
+    "passenger_number": "Passenger Number",
+    "pickup_location": "Pickup Location",
+    "drop_location": "Drop Location",
+    "pickup_date": "Pickup Date",
+    "pickup_time": "Pickup Time",
+    "reporting_time": "Reporting Time",
+    "pickup_time/reporting_time": "Pickup Time or Reporting Time",
+}
+
+
+def humanize_missing_field(field_key: str) -> str:
+    """
+    Convert an internal field key (e.g. 'passenger_name') into a
+    human-readable label (e.g. 'Passenger Name').
+    Falls back to a title-cased version if not in the mapping.
+    """
+    if not field_key:
+        return ""
+    return MISSING_FIELD_LABELS.get(field_key, field_key.replace("_", " ").title())
+
+
 # Build an HTML + plain text body listing the booking row and missing fields
 # def build_missing_info_email_body(trip, row):
 #     # row is a child row doc (table_lftf)
@@ -37,7 +60,7 @@ from sarim_app.sarim_app.services.detect_missing_fields import detect_missing_fi
 #     return html, text
 def format_missing_fields_readable(missing_info):
     """
-    Convert {"bookings": [{"missing_fields_list": [...]}, ...]} 
+    Convert {"bookings": [{"missing_fields_list": [...]}, ...]}
     into readable multi-line string for users.
     """
     if not missing_info or "bookings" not in missing_info:
@@ -46,37 +69,51 @@ def format_missing_fields_readable(missing_info):
     lines = []
     for idx, b in enumerate(missing_info.get("bookings", []), start=1):
         fields = b.get("missing_fields_list", [])
+
+        # Normalise to a list of field identifiers first
+        field_list = []
         if isinstance(fields, list):
-            fields = ", ".join(fields)
+            field_list = fields
         elif isinstance(fields, str):
-            # in case stored as string already
-            fields = fields.strip()
-        fields = fields if fields else "None (Complete)"
-        lines.append(f"Booking {idx} → {fields}")
+            # in case stored as comma-separated string already
+            field_list = [f.strip() for f in fields.split(",") if f.strip()]
+
+        # Convert each field key to a human-readable label
+        human_labels = [humanize_missing_field(f) for f in field_list]
+        fields_str = ", ".join(human_labels) if human_labels else "None (Complete)"
+
+        lines.append(f"Booking {idx} → {fields_str}")
     return "\n".join(lines)
 def build_missing_info_email_body(trip, row):
-    missing = row.missing_fields_list or "None"
+    # Convert any stored missing fields (old or new) into human-readable labels
+    raw_missing = row.missing_fields_list or ""
+    if raw_missing:
+        parts = [p.strip() for p in str(raw_missing).split(",") if p.strip()]
+        human_parts = [humanize_missing_field(p) for p in parts]
+        missing = ", ".join(human_parts) if human_parts else "None"
+    else:
+        missing = "None"
 
     html = f"""
     <p>Hello,</p>
 
     <p>Thank you for contacting us.</p>
 
-    <p>We still need a few details for your booking <b>{row.booking_number}</b> under Trip <b>{trip.name}</b>.</p>
+    <p>We still need a few important details to complete your Trip Request <b>{trip.name}</b>.</p>
 
     <p><b>Current details we have:</b></p>
 
     <ul>
-        <li><b>Passenger:</b> {row.passenger_name or '-'}
-        <li><b>Phone:</b> {row.passenger_number or '-'}
-        <li><b>Pickup:</b> {row.pickup_location or '-'}
-        <li><b>Drop:</b> {row.drop_location or '-'}
-        <li><b>Date:</b> {row.pickup_date or '-'}
-        <li><b>Time:</b> {row.pickup_time or '-'}
+        <li><b>Passenger Name:</b> {row.passenger_name or '-'}
+        <li><b>Passenger Number:</b> {row.passenger_number or '-'}
+        <li><b>Pickup Location:</b> {row.pickup_location or '-'}
+        <li><b>Drop Location:</b> {row.drop_location or '-'}
+        <li><b>Pickup Date:</b> {row.pickup_date or '-'}
+        <li><b>Pickup Time:</b> {row.pickup_time or '-'}
         <li><b>Reporting Time:</b> {row.reporting_time or '-'}
     </ul>
 
-    <p><b>Missing:</b> {missing}</p>
+    <p><b>Required Details:</b> {missing}</p>
 
     <p>Please reply to this same email (do NOT start a new thread) with the missing or corrected details.</p>
 
@@ -216,6 +253,109 @@ def send_missing_info_mail_for_row(trip, row):
             "Missing Mail Error"
         )
         return False
+
+
+# def build_confirmation_email_body(trip):
+#     """
+#     Build a confirmation email with full booking details once
+#     all bookings for a trip are complete.
+#     """
+#     # Top-level contact details
+#     poc_name = trip.poc_name or trip.booked_by_name or "-"
+#     poc_email = trip.poc_email or trip.booked_by_email or "-"
+#     poc_number = trip.poc_number or trip.booked_by_number or "-"
+
+#     # Build booking rows table
+#     booking_rows_html = ""
+#     for row in trip.table_lftf:
+#         booking_rows_html += f"""
+#         <tr>
+#             <td>{row.booking_number or '-'}</td>
+#             <td>{row.passenger_name or '-'}</td>
+#             <td>{row.passenger_number or '-'}</td>
+#             <td>{row.pickup_location or '-'}</td>
+#             <td>{row.drop_location or '-'}</td>
+#             <td>{row.pickup_date or '-'}</td>
+#             <td>{row.pickup_time or '-'}</td>
+#             <td>{row.reporting_time or '-'}</td>
+#         </tr>
+#         """
+
+#     html = f"""
+#     <p>Hello {poc_name},</p>
+
+#     <p>Your cab booking request has been <b>received and confirmed</b>.</p>
+
+#     <p><b>Trip Request:</b> {trip.name}</p>
+
+#     <p><b>Point of Contact:</b><br>
+#     Name: {poc_name}<br>
+#     Email: {poc_email}<br>
+#     Phone: {poc_number}</p>
+
+#     <p><b>Booking Details:</b></p>
+#     <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+#         <thead>
+#             <tr>
+#                 <th>Booking No.</th>
+#                 <th>Passenger Name</th>
+#                 <th>Passenger Number</th>
+#                 <th>Pickup Location</th>
+#                 <th>Drop Location</th>
+#                 <th>Pickup Date</th>
+#                 <th>Pickup Time</th>
+#                 <th>Reporting Time</th>
+#             </tr>
+#         </thead>
+#         <tbody>
+#             {booking_rows_html}
+#         </tbody>
+#     </table>
+
+#     <p>These details have been recorded in our system. If you need any changes,
+#     simply reply to this email with the updated information.</p>
+
+#     <hr>
+#     <small>Reference: Trip Request {trip.name}</small>
+#     """
+
+#     return html
+
+
+# def send_confirmation_mail_for_trip(trip):
+#     """
+#     Send a single confirmation email when a trip becomes fully complete.
+#     Guarded by trip.confirmation_mail_sent to avoid duplicates.
+#     """
+#     # Avoid duplicate sends if flag exists and is set
+#     if getattr(trip, "confirmation_mail_sent", 0):
+#         return False
+
+#     html = build_confirmation_email_body(trip)
+#     subject = f"Trip Request Confirmed - {trip.name}"
+
+#     try:
+#         frappe.sendmail(
+#             recipients=[trip.poc_email or trip.booked_by_email],
+#             subject=subject,
+#             message=html,
+#             reference_doctype="FC_BTW_Trip_Requests",
+#             reference_name=trip.name,
+#             delayed=False,
+#         )
+
+#         trip.confirmation_mail_sent = 1
+#         trip.save(ignore_permissions=True)
+#         frappe.db.commit()
+
+#         frappe.logger().info(f"📩 Confirmation mail sent for trip {trip.name}")
+#         return True
+#     except Exception as e:
+#         frappe.log_error(
+#             f"Send confirmation mail failed for {trip.name}: {str(e)}",
+#             "Trip Confirmation Mail Error",
+#         )
+#         return False
 
 
 # Helper to extract booking_number from subject - robust for common patterns
@@ -446,8 +586,6 @@ def process_received_emails_to_trip_requests():
                 for idx, b in enumerate(bookings):
                     booking_number = f"{base_name}-R{idx + 1}"
 
-                    
-
                     # ✅ Find missing fields for this booking (from missing_info)
                     booking_missing = []
                     if missing_info.get("bookings"):
@@ -458,9 +596,12 @@ def process_received_emails_to_trip_requests():
                             ):
                                 booking_missing = missing_booking.get("missing_fields", [])
                                 break
-                    # b["booking_number"] = booking_number
+
+                    # Convert raw field keys to human-readable labels for display
+                    human_missing = [humanize_missing_field(f) for f in booking_missing]
+
                     trip.append("table_lftf", {
-                        "booking_number": booking_number, 
+                        "booking_number": booking_number,
                         "passenger_name": b.get("passenger_name") or "",
                         "passenger_number": b.get("passenger_number") or "",
                         "pickup_location": b.get("pickup_location") or "",
@@ -473,12 +614,17 @@ def process_received_emails_to_trip_requests():
                         "custom_city": b.get("custom_city") or "",
                         "custom_vehicle_type": b.get("custom_vehicle_type") or "",
                         "booking_status": "Partial" if booking_missing else "Complete",
-                        "missing_fields_list": ", ".join(booking_missing) if booking_missing else ""
+                        "missing_fields_list": ", ".join(human_missing) if human_missing else ""
                     })
                 trip.insert()
                 frappe.db.commit()
 
                 trip.reload()
+
+                email_doc.trip_request_link = trip.name
+                email_doc.save(ignore_permissions=True)
+                frappe.db.commit()
+
 
                # 4️⃣ Re-run missing field detection (now with booking_numbers)
                 final_missing_info = detect_missing_fields({
@@ -498,14 +644,17 @@ def process_received_emails_to_trip_requests():
                             booking_missing = missing_booking.get("missing_fields", [])
                             break
 
-                    row.missing_fields_list = ", ".join(booking_missing) if booking_missing else ""
+                    # Convert raw field keys to human-readable labels for storage/display
+                    human_missing = [humanize_missing_field(f) for f in booking_missing]
+
+                    row.missing_fields_list = ", ".join(human_missing) if human_missing else ""
                     row.booking_status = "Partial" if booking_missing else "Complete"
 
-                    # also keep track to update parent trip_request
+                    # also keep track to update parent trip_request using human labels
                     if booking_missing:
                         updated_missing.append({
                             # "booking_number": row.booking_number,
-                            "missing_fields_list": booking_missing
+                            "missing_fields_list": human_missing
                         })
 
                 # ✅ Update the main trip doc’s missing_fields and overall status
@@ -524,6 +673,10 @@ def process_received_emails_to_trip_requests():
                 trip.overall_trip_status = "Partial" if updated_missing else "Complete"
                 trip.save(ignore_permissions=True)
                 frappe.db.commit()
+
+                # ✅ If trip is fully complete at creation time, send confirmation mail once
+                # if not updated_missing:
+                #     send_confirmation_mail_for_trip(trip)
 
                 # ✅ Sync the Extracted Email doc too
                 email_doc.missing_fields = readable_missing
@@ -689,6 +842,10 @@ def process_replies_for_trip(trip):
         trip.save(ignore_permissions=True)
         frappe.db.commit()
         trip.reload()
+
+        # When all bookings are complete, send confirmation mail (only once)
+        # if not any_partial:
+        #     send_confirmation_mail_for_trip(trip)
         # --- 7️⃣ Sync linked Extracted Email doc (if exists) ---
         try:
             ee = frappe.get_all(
