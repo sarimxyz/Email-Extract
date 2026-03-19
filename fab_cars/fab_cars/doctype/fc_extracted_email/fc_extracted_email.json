@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-10-17 15:55:36.504690",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sender",
+  "subject",
+  "has_multiple_bookings",
+  "number_of_bookings",
+  "message_body",
+  "received_date",
+  "communication_link",
+  "trip_request_status",
+  "trip_request_error",
+  "source_email_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "message_body",
+   "fieldtype": "Long Text",
+   "label": "Message Body"
+  },
+  {
+   "fieldname": "received_date",
+   "fieldtype": "Data",
+   "label": "Received Date"
+  },
+  {
+   "fieldname": "communication_link",
+   "fieldtype": "Link",
+   "label": "Communication Link",
+   "options": "Communication"
+  },
+  {
+   "fieldname": "trip_request_status",
+   "fieldtype": "Select",
+   "label": "Trip Request Status",
+   "options": "Pending\nSuccessful\nFailed"
+  },
+  {
+   "fieldname": "trip_request_error",
+   "fieldtype": "Long Text",
+   "label": "Trip Request Error"
+  },
+  {
+   "fieldname": "source_email_id",
+   "fieldtype": "Data",
+   "label": "Source Email Id"
+  },
+  {
+   "default": "0",
+   "fieldname": "has_multiple_bookings",
+   "fieldtype": "Check",
+   "label": "Has Multiple Bookings"
+  },
+  {
+   "fieldname": "number_of_bookings",
+   "fieldtype": "Int",
+   "label": "Number of Bookings"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-10-21 15:36:30.467513",
+ "modified_by": "Administrator",
+ "module": "Fab Cars",
+ "name": "FC Extracted Email",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
