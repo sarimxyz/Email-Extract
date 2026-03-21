@@ -47,7 +47,7 @@
    "fieldname": "mail_link",
    "fieldtype": "Link",
    "label": "Mail Link",
-   "options": "Communication"
+			"options": "FC Raw Email Log"
   },
   {
    "fieldname": "email_message_body",

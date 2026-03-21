@@ -19,13 +19,14 @@ def get_dashboard_data(filters=None):
 			filters = json.loads(filters)
 
 		# Execute the report
-		columns, data, message, chart, number_cards = execute(filters or {})
+		columns, data, message, chart, number_cards, total_count = execute(filters or {})
 
 		return {
 			"columns": columns,
 			"data": data,
 			"number_cards": number_cards,
-			"has_data": len(data) > 0 if data else False,
+			"total_count": total_count,
+			"has_data": (total_count > 0) if total_count is not None else (len(data) > 0 if data else False),
 		}
 
 	except Exception as e:

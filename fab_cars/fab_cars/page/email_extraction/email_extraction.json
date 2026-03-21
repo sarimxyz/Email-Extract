@@ -10,7 +10,12 @@
  "name": "email-extraction",
  "owner": "Administrator",
  "page_name": "email-extraction",
- "roles": [],
+ "title": "Email Extraction",
+ "roles": [
+  {
+   "role": "All"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,

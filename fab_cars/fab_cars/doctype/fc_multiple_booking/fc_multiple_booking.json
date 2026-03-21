@@ -12,6 +12,7 @@
   "drop_location",
   "pickup_date",
   "pickup_time",
+    "drop_date",
   "drop_time",
   "reporting_time",
   "passenger_special_request"
@@ -31,6 +32,11 @@
    "fieldname": "pickup_time",
    "fieldtype": "Data",
    "label": "Pickup Time"
+  },
+  {
+    "fieldname": "drop_date",
+    "fieldtype": "Data",
+    "label": "Drop Date"
   },
   {
    "fieldname": "drop_time",

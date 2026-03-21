@@ -1,0 +1,114 @@
+{
+	"actions": [],
+	"allow_rename": 1,
+	"creation": "2026-03-20 00:00:00",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"llm_provider",
+		"column_break_provider",
+		"section_anthropic",
+		"anthropic_api_key",
+		"anthropic_classifier_model",
+		"anthropic_extractor_model",
+		"section_openai",
+		"openai_api_key",
+		"openai_base_url",
+		"openai_classifier_model",
+		"openai_extractor_model",
+		"openai_timeout_seconds"
+	],
+	"fields": [
+		{
+			"default": "Anthropic",
+			"fieldname": "llm_provider",
+			"fieldtype": "Select",
+			"label": "LLM Provider",
+			"options": "Anthropic\nOpenAI"
+		},
+		{
+			"fieldname": "column_break_provider",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "section_anthropic",
+			"fieldtype": "Section Break",
+			"label": "Anthropic (Claude)"
+		},
+		{
+			"fieldname": "anthropic_api_key",
+			"fieldtype": "Password",
+			"label": "Anthropic API Key"
+		},
+		{
+			"default": "claude-4-sonnet-20250514",
+			"fieldname": "anthropic_classifier_model",
+			"fieldtype": "Data",
+			"label": "Anthropic Classifier Model"
+		},
+		{
+			"default": "claude-4-sonnet-20250514",
+			"fieldname": "anthropic_extractor_model",
+			"fieldtype": "Data",
+			"label": "Anthropic Extractor Model"
+		},
+		{
+			"fieldname": "section_openai",
+			"fieldtype": "Section Break",
+			"label": "OpenAI"
+		},
+		{
+			"fieldname": "openai_api_key",
+			"fieldtype": "Password",
+			"label": "OpenAI API Key"
+		},
+		{
+			"default": "https://api.openai.com",
+			"fieldname": "openai_base_url",
+			"fieldtype": "Data",
+			"label": "OpenAI Base URL"
+		},
+		{
+			"default": "gpt-4o-mini",
+			"fieldname": "openai_classifier_model",
+			"fieldtype": "Data",
+			"label": "OpenAI Classifier Model"
+		},
+		{
+			"default": "gpt-4o-mini",
+			"fieldname": "openai_extractor_model",
+			"fieldtype": "Data",
+			"label": "OpenAI Extractor Model"
+		},
+		{
+			"default": "30",
+			"fieldname": "openai_timeout_seconds",
+			"fieldtype": "Int",
+			"label": "OpenAI HTTP Timeout (seconds)"
+		}
+	],
+	"grid_page_length": 50,
+	"index_web_pages_for_search": 1,
+	"issingle": 1,
+	"links": [],
+	"module": "Fab Cars",
+	"name": "FC LLM Settings",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"print": 1,
+			"read": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		}
+	],
+	"row_format": "Dynamic",
+	"rows_threshold_for_grid_search": 20,
+	"sort_field": "modified",
+	"sort_order": "DESC",
+	"states": []
+}

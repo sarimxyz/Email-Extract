@@ -82,8 +82,7 @@ app_license = "mit"
 # Installation
 # ------------
 
-# before_install = "fab_cars.install.before_install"
-# after_install = "fab_cars.install.after_install"
+after_install = "fab_cars.install.after_install"
 
 # Uninstallation
 # ------------
@@ -137,13 +136,17 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Communication": {
+		"after_insert": "fab_cars.fab_cars.email_ingestion_service.sync_tasks.enqueue_ingestion_from_communication"
+	},
+	# # Keep the auto-generated workspace sidebar in sync when Page titles change.
+	# "Page": {
+	#     "on_update": "fab_cars.hooks_handlers.clear_workspace_sidebar_cache_on_page_update"
+	# },
+}
+
+make_email_body_message = ["fab_cars.hooks_handlers.ensure_references_header_for_threading"]
 
 # Scheduled Tasks
 # ---------------
@@ -166,14 +169,18 @@ app_license = "mit"
 # 	],
 # }
 
-# scheduler_events = {
-#     "cron":{"*/1 * * * *": [fab_cars.fab_cars.extracted_email.extract_emails_scheduler]}
-# }
-
+#
+# Legacy cron polling is disabled.
+# Real-time ingestion is handled by `email_ingestion_service` + the `ingest_email` API.
+#
+# We still use scheduler events for:
+# 1) Faster email pulls (so Communication arrives quickly)
+# 2) Retrying failed extractions
 scheduler_events = {
 	"cron": {
-		"* * * * *": [
-			"fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.process_received_emails_to_trip_requests"
+		"*/5 * * * *": [
+			"fab_cars.fab_cars.email_ingestion_service.sync_tasks.fast_pull_emails",
+			"fab_cars.fab_cars.email_ingestion_service.sync_tasks.retry_failed_ingestions",
 		]
 	}
 }
