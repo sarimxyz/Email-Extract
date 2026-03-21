@@ -8,7 +8,10 @@ from fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email import (
 	process_payload_to_trip_request,
 	resolve_is_cab_booking_for_ingestion,
 )
-from fab_cars.fab_cars.email_ingestion.followup import send_missing_info_followup
+from fab_cars.fab_cars.email_ingestion.followup import (
+	send_booking_confirmation,
+	send_missing_info_followup,
+)
 from fab_cars.fab_cars.email_ingestion.ingest_flow import (
 	effective_correlation_id,
 	ensure_email_hash,
@@ -20,6 +23,45 @@ from fab_cars.fab_cars.email_ingestion.payload import get_ingestion_max_attempts
 from fab_cars.fab_cars.email_ingestion.raw_log_messages import parent_inbound_message_id_for_followup_reply
 from fab_cars.fab_cars.email_ingestion.thread_plain_text import build_thread_plain_text_for_extraction
 from fab_cars.fab_cars.email_ingestion.thread_resolution import resolve_merge_root
+
+
+def _try_send_booking_confirmation_email(
+	*,
+	raw_log,
+	sender: str,
+	subject: str,
+	message_id: str | None,
+	correlation_id: str | None,
+	trip_request_name: str | None,
+	plain_text_snippet: str,
+) -> None:
+	if not trip_request_name:
+		return
+	try:
+		parent_message_id = parent_inbound_message_id_for_followup_reply(
+			raw_log=raw_log,
+			payload_message_id=message_id,
+			payload_correlation_id=correlation_id,
+		)
+		send_booking_confirmation(
+			to_sender=sender,
+			trip_request_name=trip_request_name,
+			in_reply_to=parent_message_id,
+			original_subject=subject,
+			thread_root_token=raw_log.name,
+			plain_text_snippet=plain_text_snippet or "",
+		)
+	except Exception as e:
+		frappe.log_error(
+			(
+				"Failed to send booking confirmation email.\n"
+				f"To sender raw: {sender}\n"
+				f"Trip request: {trip_request_name}\n"
+				f"Error: {e}\n\n"
+				f"{frappe.get_traceback()}"
+			),
+			"fab_cars booking confirmation email",
+		)
 
 
 @frappe.whitelist(allow_guest=False)
@@ -177,6 +219,17 @@ def ingest_email(payload: dict) -> dict:
 				"fab_cars email follow-up",
 			)
 
+	if result.get("status") == "ok" and result.get("trip_request"):
+		_try_send_booking_confirmation_email(
+			raw_log=raw_log,
+			sender=sender,
+			subject=subject,
+			message_id=message_id,
+			correlation_id=correlation_id,
+			trip_request_name=result.get("trip_request"),
+			plain_text_snippet=plain_text,
+		)
+
 	return {
 		"status": result.get("status"),
 		"raw_log": raw_log.name,
@@ -196,7 +249,7 @@ def reprocess_fc_raw_email_log(raw_log_name: str) -> dict:
 		current_plain_text=None,
 	)
 
-	return process_payload_to_trip_request(
+	result = process_payload_to_trip_request(
 		plain_text=thread_plain_text,
 		email_subject=raw_log.subject,
 		email_sender=raw_log.sender,
@@ -208,3 +261,14 @@ def reprocess_fc_raw_email_log(raw_log_name: str) -> dict:
 		mail_link_value=raw_log.name,
 		is_cab_booking=True,
 	)
+	if result.get("status") == "ok" and result.get("trip_request"):
+		_try_send_booking_confirmation_email(
+			raw_log=raw_log,
+			sender=raw_log.sender,
+			subject=raw_log.subject,
+			message_id=raw_log.message_id,
+			correlation_id=raw_log.correlation_id,
+			trip_request_name=result.get("trip_request"),
+			plain_text_snippet=(raw_log.plain_text or "")[:2000],
+		)
+	return result

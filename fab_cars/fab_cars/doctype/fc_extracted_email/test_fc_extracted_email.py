@@ -13,7 +13,10 @@ import fab_cars.fab_cars.api.email_ingestion_api as email_ingestion_api
 from fab_cars.fab_cars.api.email_ingestion_api import ingest_email
 from fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email import process_payload_to_trip_request
 from fab_cars.fab_cars.email_ingestion.addresses import extract_sender_email
-from fab_cars.fab_cars.email_ingestion.followup import send_missing_info_followup
+from fab_cars.fab_cars.email_ingestion.followup import (
+	send_booking_confirmation,
+	send_missing_info_followup,
+)
 from fab_cars.fab_cars.email_ingestion.payload import validate_webhook_payload
 from fab_cars.fab_cars.email_ingestion.raw_log_messages import parent_inbound_message_id_for_followup_reply
 from fab_cars.fab_cars.email_ingestion.thread_resolution import resolve_thread_root_log_name
@@ -904,6 +907,60 @@ Hi, pickup details: I can provide the phone number.
 						)
 						_, kwargs = sendmail_mock.call_args
 						self.assertEqual(kwargs.get("subject"), "Re: Cab booking from Mumbai")
+
+	def test_send_booking_confirmation_sets_in_reply_to_for_threading(self):
+		class _SettingsMock:
+			send_booking_confirmation_email = 1
+			booking_confirmation_email_subject = None
+
+		with patch(
+			"fab_cars.fab_cars.email_ingestion.followup.get_ingestion_settings",
+			return_value=_SettingsMock(),
+		):
+			with patch(
+				"fab_cars.fab_cars.email_ingestion.followup.ensure_stub_communication_for_parent_message",
+				return_value=None,
+			):
+				with patch(
+					"fab_cars.fab_cars.email_ingestion.followup.communication_name_for_sendmail_in_reply_to",
+					return_value="COM-THREAD-PARENT-1",
+				):
+					with patch("fab_cars.fab_cars.email_ingestion.followup.frappe.sendmail") as sendmail_mock:
+						send_booking_confirmation(
+							to_sender="Jane Doe <jane@example.com>",
+							trip_request_name="FC-TRIP-00001",
+							in_reply_to="<msg-1@example.com>",
+							original_subject="Cab booking request",
+							thread_root_token="FCR_root_1",
+						)
+
+						sendmail_mock.assert_called_once()
+						_, kwargs = sendmail_mock.call_args
+						self.assertEqual(kwargs.get("in_reply_to"), "COM-THREAD-PARENT-1")
+						self.assertEqual(kwargs.get("subject"), "Re: Cab booking request")
+						msg = kwargs.get("message") or ""
+						self.assertIn("FC-TRIP-00001", msg)
+						self.assertIn("FC-THREAD-ROOT:FCR_root_1", msg)
+						self.assertIn("Fab Cars", msg)
+
+	def test_send_booking_confirmation_respects_send_booking_confirmation_email_disabled(self):
+		class _SettingsMock:
+			send_booking_confirmation_email = 0
+			booking_confirmation_email_subject = None
+
+		with patch(
+			"fab_cars.fab_cars.email_ingestion.followup.get_ingestion_settings",
+			return_value=_SettingsMock(),
+		):
+			with patch("fab_cars.fab_cars.email_ingestion.followup.frappe.sendmail") as sendmail_mock:
+				send_booking_confirmation(
+					to_sender="jane@example.com",
+					trip_request_name="FC-TRIP-00001",
+					in_reply_to="<msg-1@example.com>",
+					original_subject="Cab booking request",
+					thread_root_token="FCR_root_1",
+				)
+				sendmail_mock.assert_not_called()
 
 	def test_ensure_references_header_sets_in_reply_to_from_flag(self):
 		class _FakeEmailBody:

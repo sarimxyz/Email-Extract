@@ -7,7 +7,9 @@
 	"field_order": [
 		"max_attempts",
 		"send_followup_email",
-		"followup_email_subject"
+		"followup_email_subject",
+		"send_booking_confirmation_email",
+		"booking_confirmation_email_subject"
 	],
 	"fields": [
 		{
@@ -28,6 +30,18 @@
 			"fieldname": "followup_email_subject",
 			"fieldtype": "Data",
 			"label": "Follow-up Email Subject"
+		},
+		{
+			"default": "1",
+			"fieldname": "send_booking_confirmation_email",
+			"fieldtype": "Check",
+			"label": "Send Booking Confirmation Email"
+		},
+		{
+			"default": "Your Fab Cars booking is confirmed",
+			"fieldname": "booking_confirmation_email_subject",
+			"fieldtype": "Data",
+			"label": "Booking Confirmation Email Subject"
 		}
 	],
 	"grid_page_length": 50,
