@@ -1,126 +1,128 @@
 {
-	"actions": [],
-	"allow_rename": 1,
-	"creation": "2026-03-20 00:00:00",
-	"doctype": "DocType",
-	"engine": "InnoDB",
-	"field_order": [
-		"message_id",
-		"email_hash",
-		"sender",
-		"subject",
-		"received_at",
-		"plain_text",
-		"status",
-		"attempt_count",
-		"last_error",
-		"correlation_id",
-		"thread_root_message_id",
-		"ingested_message_ids",
-		"trip_request"
-	],
-	"fields": [
-		{
-			"fieldname": "message_id",
-			"fieldtype": "Data",
-			"label": "Message Id",
-			"unique": 1,
-			"ignore_xss_filter": 1
-		},
-		{
-			"fieldname": "email_hash",
-			"fieldtype": "Data",
-			"label": "Email Hash",
-			"unique": 1
-		},
-		{
-			"fieldname": "sender",
-			"fieldtype": "Data",
-			"label": "Sender"
-		},
-		{
-			"fieldname": "subject",
-			"fieldtype": "Data",
-			"label": "Subject"
-		},
-		{
-			"fieldname": "received_at",
-			"fieldtype": "Datetime",
-			"label": "Received At"
-		},
-		{
-			"fieldname": "plain_text",
-			"fieldtype": "Long Text",
-			"label": "Plain Text"
-		},
-		{
-			"fieldname": "status",
-			"fieldtype": "Select",
-			"label": "Status",
-			"options": "Pending\nProcessing\nNeeds Info\nSuccessful\nFailed\nSkipped\nRetried"
-		},
-		{
-			"fieldname": "attempt_count",
-			"fieldtype": "Int",
-			"label": "Attempt Count",
-			"default": "0"
-		},
-		{
-			"fieldname": "last_error",
-			"fieldtype": "Long Text",
-			"label": "Last Error"
-		},
-		{
-			"fieldname": "correlation_id",
-			"fieldtype": "Data",
-			"label": "Correlation Id"
-		},
-		{
-			"fieldname": "thread_root_message_id",
-			"fieldtype": "Data",
-			"label": "Thread root Message Id",
-			"description": "RFC Message-ID of the first inbound mail in this thread (for follow-up In-Reply-To). Latest inbound id is stored in `message_id`.",
-			"ignore_xss_filter": 1
-		},
-		{
-			"fieldname": "ingested_message_ids",
-			"fieldtype": "Long Text",
-			"label": "Ingested Message Ids",
-			"hidden": 1,
-			"description": "Newline-separated RFC Message-IDs already merged into this log (idempotency for thread replies)."
-		},
-		{
-			"fieldname": "trip_request",
-			"fieldtype": "Link",
-			"label": "Trip Request",
-			"options": "FC Trip Request"
-		}
-	],
-	"grid_page_length": 50,
-	"index_web_pages_for_search": 1,
-	"links": [],
-	"module": "Fab Cars",
-	"name": "FC Raw Email Log",
-	"naming_rule": "By script",
-	"owner": "Administrator",
-	"permissions": [
-		{
-			"create": 1,
-			"delete": 1,
-			"email": 1,
-			"export": 1,
-			"print": 1,
-			"read": 1,
-			"report": 1,
-			"role": "System Manager",
-			"share": 1,
-			"write": 1
-		}
-	],
-	"row_format": "Dynamic",
-	"rows_threshold_for_grid_search": 20,
-	"sort_field": "modified",
-	"sort_order": "DESC",
-	"states": []
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-20 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "message_id",
+  "email_hash",
+  "sender",
+  "subject",
+  "received_at",
+  "plain_text",
+  "status",
+  "attempt_count",
+  "last_error",
+  "correlation_id",
+  "thread_root_message_id",
+  "ingested_message_ids",
+  "trip_request"
+ ],
+ "fields": [
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "ignore_xss_filter": 1,
+   "label": "Message Id",
+   "unique": 1
+  },
+  {
+   "fieldname": "email_hash",
+   "fieldtype": "Data",
+   "label": "Email Hash",
+   "unique": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At"
+  },
+  {
+   "fieldname": "plain_text",
+   "fieldtype": "Long Text",
+   "label": "Plain Text"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nProcessing\nNeeds Info\nSuccessful\nFailed\nSkipped\nRetried"
+  },
+  {
+   "default": "0",
+   "fieldname": "attempt_count",
+   "fieldtype": "Int",
+   "label": "Attempt Count"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Long Text",
+   "label": "Last Error"
+  },
+  {
+   "fieldname": "correlation_id",
+   "fieldtype": "Data",
+   "label": "Correlation Id"
+  },
+  {
+   "description": "RFC Message-ID of the first inbound mail in this thread (for follow-up In-Reply-To). Latest inbound id is stored in `message_id`.",
+   "fieldname": "thread_root_message_id",
+   "fieldtype": "Data",
+   "ignore_xss_filter": 1,
+   "label": "Thread root Message Id"
+  },
+  {
+   "description": "Newline-separated RFC Message-IDs already merged into this log (idempotency for thread replies).",
+   "fieldname": "ingested_message_ids",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Ingested Message Ids"
+  },
+  {
+   "fieldname": "trip_request",
+   "fieldtype": "Link",
+   "label": "Trip Request",
+   "options": "FC Trip Request"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-21 12:28:40.495620",
+ "modified_by": "Administrator",
+ "module": "Fab Cars",
+ "name": "FC Raw Email Log",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
 }
-

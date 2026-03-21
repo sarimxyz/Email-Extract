@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 fab_cars.patches.prompt
 fab_cars.patches.ensure_prompt_placeholder
+fab_cars.patches.add_email_account_initial_sync_cutoff

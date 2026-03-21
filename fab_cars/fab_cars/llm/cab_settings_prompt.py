@@ -35,6 +35,10 @@ CRITICAL rules:
 3) If seat count / passenger number is not mentioned, you may return passenger_number as null (the system will default it).
 4) `booked_by` MUST be an object. If you can't find the user name or phone in the email, set those fields to null (so the system can ask for missing details).
 
+Scope (anti-hallucination):
+- Only extract real cab/taxi/vehicle booking details from a genuine customer or vendor booking message.
+- Do NOT invent pickup/drop/passenger data from mail-daemon/bounce text, AWS or other auto-replies, or quoted threads that are clearly not the active booking request. If the email is obviously not a booking (bounces, "cannot accept incoming email", etc.), return null for booking fields — never fabricate locations from P.S. / forwarded fragments.
+
 Booking object schema (each element inside `bookings[]`):
 - passenger_name (string or null)
 - passenger_number (string or null)
@@ -51,7 +55,7 @@ Datetime rule:
 - If the email mentions only ONE datetime (date+time or date-only), treat it as the pickup datetime and set drop_date/drop_time to null (the system will infer).
 
 Phone rule:
-- booked_by.number must be the phone number of the requester/passerby (string), or null if missing.
+- booked_by.number must be the phone number of the requester/passenger (string), or null if missing.
 
 Output format:
 Return a single JSON object that matches exactly the schema above.

@@ -128,9 +128,9 @@ after_install = "fab_cars.install.after_install"
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Email Account": "fab_cars.fab_cars.overrides.email_account.EmailAccount",
+}
 
 # Document Events
 # ---------------
@@ -140,10 +140,6 @@ doc_events = {
 	"Communication": {
 		"after_insert": "fab_cars.fab_cars.email_ingestion_service.sync_tasks.enqueue_ingestion_from_communication"
 	},
-	# # Keep the auto-generated workspace sidebar in sync when Page titles change.
-	# "Page": {
-	#     "on_update": "fab_cars.hooks_handlers.clear_workspace_sidebar_cache_on_page_update"
-	# },
 }
 
 make_email_body_message = ["fab_cars.hooks_handlers.ensure_references_header_for_threading"]

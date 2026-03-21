@@ -11,6 +11,11 @@ from frappe.core.utils import html2text
 from frappe.model.document import Document
 from frappe.utils.user import get_system_managers
 
+from fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email import (
+	email_looks_like_bounce_or_system_auto_reply,
+)
+from fab_cars.fab_cars.email_ingestion.ingestion_cutoff import should_enqueue_ingestion_for_communication
+
 
 def _get_system_user() -> str:
 	"""Pick a user with permissions to write internal ingestion doctypes."""
@@ -174,17 +179,27 @@ def _build_thread_plain_text_from_communication(
 
 
 def _heuristic_is_cab_booking(*, subject: str, plain_text: str) -> bool | None:
-	"""
-	Quick keyword gate to reduce expensive LLM calls.
+	"""False = skip ingestion without LLM. None = let ``ingest_email`` classify (never return True)."""
+	if email_looks_like_bounce_or_system_auto_reply(email_subject=subject, plain_text=plain_text):
+		return False
 
-	Returns:
-	- True: strongly looks like cab/taxi/vehicle booking
-	- False: clearly not a cab booking (we should skip classifier)
-	- None: ambiguous -> fall back to LLM classifier
-	"""
 	blob = f"{subject or ''}\n{plain_text or ''}".lower()
 
-	positive_keywords = [
+	spam_signals = (
+		"otp",
+		"one-time password",
+		"password",
+		"reset",
+		"verification code",
+		"marketing",
+		"promotion",
+		"invoice",
+		"payment",
+		"receipt",
+		"unsubscribe",
+		"welcome",
+	)
+	booking_signals = (
 		"cab",
 		"taxi",
 		"vehicle",
@@ -198,34 +213,9 @@ def _heuristic_is_cab_booking(*, subject: str, plain_text: str) -> bool | None:
 		"trip",
 		"booking",
 		"travel",
-	]
-	negative_keywords = [
-		"otp",
-		"one-time password",
-		"password",
-		"reset",
-		"verification code",
-		"newsletter",
-		"marketing",
-		"promotion",
-		"invoice",
-		"payment",
-		"receipt",
-		"unsubscribe",
-		"welcome",
-	]
-
-	looks_positive = any(k in blob for k in positive_keywords)
-	looks_negative = any(k in blob for k in negative_keywords)
-
-	# If there's strong evidence it's not a booking, skip.
-	if looks_negative and not looks_positive:
+	)
+	if any(s in blob for s in spam_signals) and not any(s in blob for s in booking_signals):
 		return False
-
-	# If we find any booking intent keywords, we can avoid the classifier.
-	if looks_positive:
-		return True
-
 	return None
 
 
@@ -281,6 +271,9 @@ def enqueue_ingestion_from_communication(doc: Document, method: str | None = Non
 		if (doc.get("communication_medium") or "") != "Email":
 			return
 		if (doc.get("sent_or_received") or "") != "Received":
+			return
+
+		if not should_enqueue_ingestion_for_communication(doc):
 			return
 
 		# Convert to plain text early, so heuristic can avoid unnecessary LLM calls.

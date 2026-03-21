@@ -2,23 +2,17 @@
 # For license information, please see license.txt
 
 import frappe
-from frappe import _
 
 
 @frappe.whitelist(allow_guest=False)
 def get_dashboard_data(filters=None):
 	"""API endpoint to get dashboard data"""
 	try:
-		# Import the report function
 		from fab_cars.fab_cars.report.dashboard_report.dashboard_report import execute
 
-		# Parse filters
 		if isinstance(filters, str):
-			import json
+			filters = frappe.parse_json(filters)
 
-			filters = json.loads(filters)
-
-		# Execute the report
 		columns, data, message, chart, number_cards, total_count = execute(filters or {})
 
 		return {

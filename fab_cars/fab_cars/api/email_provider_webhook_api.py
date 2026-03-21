@@ -49,6 +49,23 @@ def _to_frappe_ingest_payload(*, ingest_payload: dict[str, Any]) -> dict[str, An
 	}
 
 
+def _run_provider_webhook(
+	extract_payload: Any,
+	payload: dict[str, Any],
+	*,
+	log_title: str,
+) -> dict[str, Any]:
+	try:
+		_maybe_verify_webhook()
+		ingest_payload = extract_payload(payload or {})
+		req_payload = _to_frappe_ingest_payload(ingest_payload=ingest_payload)
+		result = ingest_email(req_payload)
+		return {"ok": True, "result": result}
+	except Exception as e:
+		frappe.log_error(str(e), log_title)
+		return {"ok": False, "error": str(e)}
+
+
 @frappe.whitelist(allow_guest=True)
 def healthz() -> dict[str, Any]:
 	return {"ok": True}
@@ -63,16 +80,11 @@ def sendgrid_webhook(payload: dict[str, Any]) -> dict[str, Any]:
 	so you do NOT need to keep `webhook_server.py` running as a separate daemon.
 	"""
 
-	try:
-		_maybe_verify_webhook()
-
-		ingest_payload = webhook_adapter._extract_sendgrid_payload(payload or {})
-		req_payload = _to_frappe_ingest_payload(ingest_payload=ingest_payload)
-		result = ingest_email(req_payload)
-		return {"ok": True, "result": result}
-	except Exception as e:
-		frappe.log_error(str(e), "fab_cars sendgrid webhook")
-		return {"ok": False, "error": str(e)}
+	return _run_provider_webhook(
+		webhook_adapter._extract_sendgrid_payload,
+		payload,
+		log_title="fab_cars sendgrid webhook",
+	)
 
 
 @frappe.whitelist(allow_guest=True)
@@ -85,13 +97,8 @@ def gmail_webhook(payload: dict[str, Any]) -> dict[str, Any]:
 	  (or provide `plain_text`) so extraction can proceed.
 	"""
 
-	try:
-		_maybe_verify_webhook()
-
-		ingest_payload = webhook_adapter._extract_gmail_payload(payload or {})
-		req_payload = _to_frappe_ingest_payload(ingest_payload=ingest_payload)
-		result = ingest_email(req_payload)
-		return {"ok": True, "result": result}
-	except Exception as e:
-		frappe.log_error(str(e), "fab_cars gmail webhook")
-		return {"ok": False, "error": str(e)}
+	return _run_provider_webhook(
+		webhook_adapter._extract_gmail_payload,
+		payload,
+		log_title="fab_cars gmail webhook",
+	)

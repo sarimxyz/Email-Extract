@@ -1,24 +1,6 @@
 import frappe
 
 
-def clear_workspace_sidebar_cache_on_page_update(doc, method=None):
-	"""
-	`WorkspaceSidebar.auto_generate_sidebar_from_module` is cached with `site_cache()`.
-	If a Page title changes, we must clear that in-process cache or the sidebar will
-	continue rendering a blank label until server restart.
-	"""
-	try:
-		from frappe.desk.doctype.workspace_sidebar.workspace_sidebar import (
-			auto_generate_sidebar_from_module,
-		)
-
-		# Clear only this cached function for all sites in the current worker.
-		auto_generate_sidebar_from_module.clear_cache()
-	except Exception:
-		# Non-fatal: worst case, sidebar refresh requires manual cache clear/reload.
-		pass
-
-
 def ensure_references_header_for_threading(email_body):
 	"""
 	Threading for outbound mail:
@@ -26,7 +8,7 @@ def ensure_references_header_for_threading(email_body):
 	1. **Fab Cars fallback**: `EmailQueue.prepare_email_content` only sets `In-Reply-To`
 	   when `in_reply_to` is a `Communication.name` with a stored `message_id`. Inbound
 	   mail that never matched a Communication (webhook-only, timing) would otherwise
-	   send with no threading headers. `fab_cars.fab_cars.api.email_ingestion_api`
+	   send with no threading headers. `fab_cars.fab_cars.email_ingestion.followup`
 	   stashes the customer's RFC Message-ID in `frappe.flags.fab_cars_thread_parent_message_id`
 	   for the duration of `frappe.sendmail`; we inject it here if Frappe left
 	   `In-Reply-To` empty.

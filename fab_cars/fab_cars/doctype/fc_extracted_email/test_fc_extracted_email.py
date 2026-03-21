@@ -9,9 +9,14 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from fab_cars.fab_cars.api import email_ingestion_api
+import fab_cars.fab_cars.api.email_ingestion_api as email_ingestion_api
 from fab_cars.fab_cars.api.email_ingestion_api import ingest_email
 from fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email import process_payload_to_trip_request
+from fab_cars.fab_cars.email_ingestion.addresses import extract_sender_email
+from fab_cars.fab_cars.email_ingestion.followup import send_missing_info_followup
+from fab_cars.fab_cars.email_ingestion.payload import validate_webhook_payload
+from fab_cars.fab_cars.email_ingestion.raw_log_messages import parent_inbound_message_id_for_followup_reply
+from fab_cars.fab_cars.email_ingestion.thread_resolution import resolve_thread_root_log_name
 from fab_cars.fab_cars.email_ingestion_service import webhook_server as ingestion_webhook_server
 from fab_cars.fab_cars.llm.llm_client import LLMResult
 from fab_cars.hooks_handlers import ensure_references_header_for_threading
@@ -208,7 +213,7 @@ class TestExtractedEmail(FrappeTestCase):
 			# Must be unique: ingest_email treats any prior Successful log with same correlation_id as thread-complete.
 			"correlation_id": f"corr-merge-reply-{uuid.uuid4().hex}",
 		}
-		self.assertEqual(email_ingestion_api._validate_payload(reply_payload)["message_id"], mid2)
+		self.assertEqual(validate_webhook_payload(reply_payload)["message_id"], mid2)
 
 		with patch(
 			"fab_cars.fab_cars.api.email_ingestion_api.process_payload_to_trip_request",
@@ -346,9 +351,13 @@ class TestExtractedEmail(FrappeTestCase):
 			raw_log.insert()
 			frappe.db.commit()
 
+		def _fake_llm_invoke_text(*, prompt: str, model: str, max_tokens: int):
+			# Existing Processing raw log skips the classifier; extractor must not run.
+			raise AssertionError("LLM must not run while raw log is Processing")
+
 		with patch(
 			"fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.llm_invoke_text",
-			side_effect=AssertionError("Extractor must not run while raw log is Processing"),
+			side_effect=_fake_llm_invoke_text,
 		):
 			res = ingest_email(payload)
 
@@ -360,13 +369,14 @@ class TestExtractedEmail(FrappeTestCase):
 		self.assertEqual(trip_count, 0)
 
 	def test_ingest_email_marks_skipped_when_not_cab_booking(self):
+		mid = f"<msg-skipped-{uuid.uuid4().hex}@example.com>"  # avoids stale FCR_* breaking apply_cab_gate
 		payload = {
-			"message_id": "<msg-2@example.com>",
+			"message_id": mid,
 			"sender": "marketing@example.com",
-			"subject": "Newsletter",
+			"subject": "Quick question",
 			"received_at": "2026-03-19T10:00:00Z",
-			"plain_text": "hello newsletter",
-			"correlation_id": "corr-2",
+			"plain_text": "How is the weather today?",
+			"correlation_id": f"corr-2-{uuid.uuid4().hex}",
 		}
 
 		def _fake_llm_invoke_text(*, prompt: str, model: str, max_tokens: int):
@@ -383,8 +393,57 @@ class TestExtractedEmail(FrappeTestCase):
 			res = ingest_email(payload)
 
 		self.assertEqual(res["status"], "skipped")
-		raw_log = frappe.get_doc("FC Raw Email Log", res["raw_log"])
-		self.assertEqual(raw_log.status, "Skipped")
+		self.assertIsNone(res.get("raw_log"))
+		self.assertFalse(frappe.db.exists("FC Raw Email Log", {"message_id": mid}))
+
+	def test_ingest_email_skips_without_raw_log_when_payload_flags_not_cab(self):
+		"""Explicit ``is_cab_booking: false`` skips before any raw log insert (no LLM)."""
+		payload = {
+			"message_id": "<msg-heuristic-false@example.com>",
+			"sender": "a@example.com",
+			"subject": "Anything",
+			"received_at": "2026-03-19T10:00:00Z",
+			"plain_text": "pickup airport taxi booking",
+			"is_cab_booking": False,
+		}
+
+		def _must_not_call_llm(*args, **kwargs):
+			raise AssertionError("Classifier must not run when is_cab_booking is False")
+
+		with patch(
+			"fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.llm_invoke_text",
+			side_effect=_must_not_call_llm,
+		):
+			res = ingest_email(payload)
+
+		self.assertEqual(res["status"], "skipped")
+		self.assertIsNone(res.get("raw_log"))
+
+	def test_ingest_email_skips_aws_bounce_without_llm_or_raw_log(self):
+		"""Bounce / AWS system mail is rejected by substring gate before classifier (no LLM)."""
+		payload = {
+			"message_id": "<aws-bounce-1@example.com>",
+			"sender": "no-reply@amazonaws.com",
+			"subject": "Automatic reply",
+			"received_at": "2026-03-21T10:00:00Z",
+			"plain_text": (
+				"Greetings from Amazon Web Services.\n\n"
+				"We're sorry. You've written to an address that cannot accept incoming e-mail.\n"
+				"Visit http://www.aws.amazon.com/contact-us .\n"
+			),
+		}
+
+		def _must_not_call_llm(*args, **kwargs):
+			raise AssertionError("LLM must not run for AWS/bounce mail")
+
+		with patch(
+			"fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.llm_invoke_text",
+			side_effect=_must_not_call_llm,
+		):
+			res = ingest_email(payload)
+
+		self.assertEqual(res["status"], "skipped")
+		self.assertIsNone(res.get("raw_log"))
 
 	def test_process_payload_derives_drop_date_time_when_missing(self):
 		extracted_email = frappe.get_doc(
@@ -618,24 +677,22 @@ class TestExtractedEmail(FrappeTestCase):
 		self.assertEqual(extracted_email.reload().trip_request_status, "Successful")
 
 	def test_extract_sender_email_is_robust_to_real_from_header_strings(self):
+		self.assertEqual(extract_sender_email("john.doe@example.com"), "john.doe@example.com")
 		self.assertEqual(
-			email_ingestion_api._extract_sender_email("john.doe@example.com"), "john.doe@example.com"
-		)
-		self.assertEqual(
-			email_ingestion_api._extract_sender_email("John Doe <john.doe@example.com>"),
+			extract_sender_email("John Doe <john.doe@example.com>"),
 			"john.doe@example.com",
 		)
 		# Should extract the first email address even if there is extra text after it.
 		self.assertEqual(
-			email_ingestion_api._extract_sender_email("john.doe@example.com (via example-newsletter)"),
+			extract_sender_email("john.doe@example.com (via example-newsletter)"),
 			"john.doe@example.com",
 		)
 		# When no email address exists, follow-up should not be sent.
-		self.assertIsNone(email_ingestion_api._extract_sender_email("Just a display name"))
+		self.assertIsNone(extract_sender_email("Just a display name"))
 
 	def test_parent_inbound_message_id_prefers_thread_root_then_latest(self):
 		self.assertEqual(
-			email_ingestion_api._parent_inbound_message_id_for_followup_reply(
+			parent_inbound_message_id_for_followup_reply(
 				raw_log={
 					"thread_root_message_id": "<root@example.com>",
 					"message_id": "<latest@example.com>",
@@ -648,7 +705,7 @@ class TestExtractedEmail(FrappeTestCase):
 
 	def test_parent_inbound_message_id_prefers_raw_log_then_payload(self):
 		self.assertEqual(
-			email_ingestion_api._parent_inbound_message_id_for_followup_reply(
+			parent_inbound_message_id_for_followup_reply(
 				raw_log={"message_id": "<stored-on-log@example.com>"},
 				payload_message_id="<payload@example.com>",
 				payload_correlation_id="<corr@example.com>",
@@ -656,7 +713,7 @@ class TestExtractedEmail(FrappeTestCase):
 			"<stored-on-log@example.com>",
 		)
 		self.assertEqual(
-			email_ingestion_api._parent_inbound_message_id_for_followup_reply(
+			parent_inbound_message_id_for_followup_reply(
 				raw_log={"message_id": None},
 				payload_message_id="<payload@example.com>",
 				payload_correlation_id="<corr@example.com>",
@@ -667,7 +724,7 @@ class TestExtractedEmail(FrappeTestCase):
 	def test_parent_inbound_message_id_skips_fcr_correlation_token(self):
 		"""`FCR_*` is our raw-log name / thread token, not the customer's Message-ID."""
 		self.assertEqual(
-			email_ingestion_api._parent_inbound_message_id_for_followup_reply(
+			parent_inbound_message_id_for_followup_reply(
 				raw_log=None,
 				payload_message_id=None,
 				payload_correlation_id="FCR_abc123deadbeef",
@@ -675,7 +732,7 @@ class TestExtractedEmail(FrappeTestCase):
 			None,
 		)
 		self.assertEqual(
-			email_ingestion_api._parent_inbound_message_id_for_followup_reply(
+			parent_inbound_message_id_for_followup_reply(
 				raw_log=None,
 				payload_message_id="<only@example.com>",
 				payload_correlation_id="FCR_ignored",
@@ -713,9 +770,10 @@ Hi, pickup details: I can provide the phone number.
 			return None
 
 		with patch(
-			"fab_cars.fab_cars.api.email_ingestion_api.frappe.db.get_value", side_effect=_fake_get_value
+			"fab_cars.fab_cars.email_ingestion.message_ids.frappe.db.get_value",
+			side_effect=_fake_get_value,
 		):
-			res = email_ingestion_api._resolve_thread_root_log_name(
+			res = resolve_thread_root_log_name(
 				plain_text="no token in body",
 				correlation_id="<stored-on-log@example.com>",
 			)
@@ -732,9 +790,10 @@ Hi, pickup details: I can provide the phone number.
 			return None
 
 		with patch(
-			"fab_cars.fab_cars.api.email_ingestion_api.frappe.db.get_value", side_effect=_fake_get_value
+			"fab_cars.fab_cars.email_ingestion.message_ids.frappe.db.get_value",
+			side_effect=_fake_get_value,
 		):
-			res = email_ingestion_api._resolve_thread_root_log_name(
+			res = resolve_thread_root_log_name(
 				plain_text="no token in body",
 				correlation_id="<stored-on-log@example.com>",
 			)
@@ -746,21 +805,21 @@ Hi, pickup details: I can provide the phone number.
 			followup_email_subject = None
 
 		with patch(
-			"fab_cars.fab_cars.api.email_ingestion_api._get_ingestion_settings",
+			"fab_cars.fab_cars.email_ingestion.followup.get_ingestion_settings",
 			return_value=_SettingsMock(),
 		):
 			# Frappe sendmail threading: `in_reply_to` must be Communication.name
 			# (see EmailQueue.prepare_email_content), not the raw Message-ID string.
 			with patch(
-				"fab_cars.fab_cars.api.email_ingestion_api._ensure_stub_communication_for_parent_message",
+				"fab_cars.fab_cars.email_ingestion.followup.ensure_stub_communication_for_parent_message",
 				return_value=None,
 			):
 				with patch(
-					"fab_cars.fab_cars.api.email_ingestion_api._communication_name_for_sendmail_in_reply_to",
+					"fab_cars.fab_cars.email_ingestion.followup.communication_name_for_sendmail_in_reply_to",
 					return_value="COM-THREAD-PARENT-1",
 				):
-					with patch("fab_cars.fab_cars.api.email_ingestion_api.frappe.sendmail") as sendmail_mock:
-						email_ingestion_api._send_missing_info_followup(
+					with patch("fab_cars.fab_cars.email_ingestion.followup.frappe.sendmail") as sendmail_mock:
+						send_missing_info_followup(
 							to_sender="John Doe <john.doe@example.com>",
 							missing_fields=["Pickup location"],
 							in_reply_to="<msg-1@example.com>",
@@ -790,22 +849,22 @@ Hi, pickup details: I can provide the phone number.
 			seen["flag_during_send"] = frappe.flags.get("fab_cars_thread_parent_message_id")
 
 		with patch(
-			"fab_cars.fab_cars.api.email_ingestion_api._get_ingestion_settings",
+			"fab_cars.fab_cars.email_ingestion.followup.get_ingestion_settings",
 			return_value=_SettingsMock(),
 		):
 			with patch(
-				"fab_cars.fab_cars.api.email_ingestion_api._ensure_stub_communication_for_parent_message",
+				"fab_cars.fab_cars.email_ingestion.followup.ensure_stub_communication_for_parent_message",
 				return_value=None,
 			):
 				with patch(
-					"fab_cars.fab_cars.api.email_ingestion_api._communication_name_for_sendmail_in_reply_to",
+					"fab_cars.fab_cars.email_ingestion.followup.communication_name_for_sendmail_in_reply_to",
 					return_value=None,
 				):
 					with patch(
-						"fab_cars.fab_cars.api.email_ingestion_api.frappe.sendmail",
+						"fab_cars.fab_cars.email_ingestion.followup.frappe.sendmail",
 						side_effect=_capture_sendmail,
 					):
-						email_ingestion_api._send_missing_info_followup(
+						send_missing_info_followup(
 							to_sender="John Doe <john.doe@example.com>",
 							missing_fields=["Pickup location"],
 							in_reply_to="<msg-1@example.com>",
@@ -824,19 +883,19 @@ Hi, pickup details: I can provide the phone number.
 			followup_email_subject = "We need a few details to confirm your cab booking"
 
 		with patch(
-			"fab_cars.fab_cars.api.email_ingestion_api._get_ingestion_settings",
+			"fab_cars.fab_cars.email_ingestion.followup.get_ingestion_settings",
 			return_value=_SettingsMock(),
 		):
 			with patch(
-				"fab_cars.fab_cars.api.email_ingestion_api._ensure_stub_communication_for_parent_message",
+				"fab_cars.fab_cars.email_ingestion.followup.ensure_stub_communication_for_parent_message",
 				return_value=None,
 			):
 				with patch(
-					"fab_cars.fab_cars.api.email_ingestion_api._communication_name_for_sendmail_in_reply_to",
+					"fab_cars.fab_cars.email_ingestion.followup.communication_name_for_sendmail_in_reply_to",
 					return_value="COM-THREAD-PARENT-1",
 				):
-					with patch("fab_cars.fab_cars.api.email_ingestion_api.frappe.sendmail") as sendmail_mock:
-						email_ingestion_api._send_missing_info_followup(
+					with patch("fab_cars.fab_cars.email_ingestion.followup.frappe.sendmail") as sendmail_mock:
+						send_missing_info_followup(
 							to_sender="John Doe <john.doe@example.com>",
 							missing_fields=["Drop location"],
 							in_reply_to="<msg-1@example.com>",

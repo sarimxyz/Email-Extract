@@ -506,7 +506,6 @@ function update_data_table(data) {
 
 function get_status_badge_class(status) {
 	switch (status) {
-		// case 'New': return 'primary';
 		case "Pending":
 			return "warning";
 		case "Needs Info":

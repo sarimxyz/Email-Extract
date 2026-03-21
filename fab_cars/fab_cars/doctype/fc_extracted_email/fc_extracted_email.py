@@ -8,6 +8,8 @@ from typing import Any
 import frappe
 from frappe.model.document import Document
 
+from fab_cars.fab_cars.email_ingestion.constants import THREAD_MERGE_SEPARATOR
+from fab_cars.fab_cars.email_ingestion.thread_plain_text import split_thread_plain_text_segments
 from fab_cars.fab_cars.llm.llm_client import get_default_llm_models, llm_invoke_text
 
 
@@ -63,39 +65,65 @@ def _parse_llm_json_object(text: str) -> dict:
 		return json.loads(m.group(0))
 
 
+_NON_BOOKING_SYSTEM_SUBSTRINGS: tuple[str, ...] = (
+	# Bounces / delivery infrastructure
+	"cannot accept incoming",
+	"address that cannot accept",
+	"mailer-daemon",
+	"mail delivery failed",
+	"message could not be delivered",
+	"undeliverable",
+	"returned mail",
+	"delivery status notification",
+	"failure notice",
+	"amazon web services",
+	"@amazonaws.com",
+	"no-reply@",
+	"donotreply",
+	"do not reply to this message",
+	"automatic reply",
+	"auto-reply",
+	"out of office",
+	"out of the office",
+	"newsletter",
+)
+
+
+def email_looks_like_bounce_or_system_auto_reply(*, email_subject: str, plain_text: str) -> bool:
+	"""Fast path: obvious bounces and vendor system mail are never cab bookings."""
+	blob = f"{email_subject or ''}\n{plain_text or ''}".lower()
+	return any(s in blob for s in _NON_BOOKING_SYSTEM_SUBSTRINGS)
+
+
 def _call_llm_classifier(*, email_subject: str, plain_text: str) -> bool:
 	"""Return True if email is (likely) a cab/taxi/vehicle booking request."""
 	email_content = _build_email_content(email_subject, plain_text)
 
 	validation_prompt = f"""
-You are an expert email classifier for identifying CAB / TAXI / VEHICLE BOOKING related emails.
+You are an expert email classifier for CAB / TAXI / VEHICLE BOOKING intake (ground transport: cab, taxi, chauffeur, airport transfer, corporate car, etc.).
 
-Your job: Analyze the following email and decide if it is related to any CAB BOOKING, TAXI BOOKING, VEHICLE BOOKING, or TRAVEL REQUEST.
+Decide whether this email is a genuine booking-related message worth processing (request, confirmation, or reply about a transport booking).
 
 Email:
 {email_content}
 
-IMPORTANT RULES:
-- Return ONLY a raw JSON object. No markdown, no text, no code blocks.
-- Format:
+Return ONLY valid JSON (no markdown, no code fences):
 {{"is_cab_booking": true or false, "reason": "short explanation"}}
 
-CLASSIFY AS TRUE (cab booking) IF email contains **any** of the following:
-- Mentions of cab, taxi, vehicle, car, trip, chauffeur, airport pickup/drop, etc.
-- Passenger names, pickup/drop locations, travel date or time.
-- Booking confirmation, request for cab, or trip details.
-- Vendor or company sending cab booking confirmations.
-- Attachments or booking details even if short.
+CLASSIFY AS FALSE (is_cab_booking: false) — use this when ANY of the following apply:
+- Mail delivery / bounce / nondelivery notices: undeliverable, Mailer-Daemon, "cannot accept incoming email", "returned mail", delivery failure, message not delivered.
+- Automated system or vendor auto-replies: Amazon Web Services / AWS, no-reply@amazonaws.com or similar, generic "thank you for contacting" with no booking content, out-of-office, automatic reply.
+- The visible message body is clearly not from a person requesting or confirming a vehicle booking (e.g. only a template saying the mailbox cannot receive mail).
+- Pure OTP, newsletter, marketing blast, password reset, unrelated IT notices.
+- Invoice/payment-dunning threads where the **current** message is only a system/bounce wrapper — even if quoted text below mentions old subjects; classify on the **actual** top-level message intent.
 
-CLASSIFY AS FALSE (not cab booking) IF:
-- It's OTP, marketing, newsletter, or unrelated service mail.
-- It's about invoices, password resets, or welcome messages.
+CLASSIFY AS TRUE (is_cab_booking: true) when:
+- A human or business is requesting, confirming, or discussing a cab/taxi/vehicle trip (pickup/drop, passenger, date/time, airport run, etc.).
+- Short but clear booking intent (e.g. pickup and drop mentioned).
 
-⚠️ Even if the email looks partially like a booking (e.g., “Request for vehicle” or “trip details”), still mark TRUE.
-Be lenient — better to classify possibly true than to miss one.
+Do NOT treat quoted "Re:" subjects or P.S. fragments from forwarded/bounced mail as proof of a new booking if the real message is a bounce or AWS-style auto response.
 
-Return result strictly as JSON:
-{{"is_cab_booking": true, "reason": "mentions pickup and drop details"}}
+Be somewhat lenient for genuine customer wording, but NEVER mark TRUE for bounces, Mailer-Daemon, or AWS/system cannot-receive-mail messages.
 """
 
 	models = get_default_llm_models()
@@ -107,6 +135,30 @@ Return result strictly as JSON:
 
 	validation_data = _parse_llm_json_object(result.text)
 	return bool(validation_data.get("is_cab_booking", False))
+
+
+def resolve_is_cab_booking_for_ingestion(
+	*,
+	is_cab_booking: bool | None,
+	email_subject: str,
+	plain_text: str,
+	force_allow_without_classifier: bool = False,
+) -> bool:
+	"""
+	Whether this inbound message should enter the booking extraction pipeline.
+
+	``force_allow_without_classifier`` is True for thread merges and thread-success
+	shortcuts so short replies are not rejected by the classifier.
+	"""
+	if force_allow_without_classifier:
+		return True
+	if email_looks_like_bounce_or_system_auto_reply(email_subject=email_subject, plain_text=plain_text):
+		return False
+	if is_cab_booking is False:
+		return False
+	if is_cab_booking is True:
+		return True
+	return _call_llm_classifier(email_subject=email_subject, plain_text=plain_text)
 
 
 def _entity_field(data: dict, key: str) -> dict:
@@ -222,10 +274,6 @@ def _derive_drop_fields_from_pickup(bookings: list[dict]) -> None:
 			b["drop_time"] = b.get("pickup_time")
 
 
-# Must match `fab_cars.fab_cars.api.email_ingestion_api` thread merge separator (avoid import cycles).
-_THREAD_PLAIN_TEXT_SEP = "\n\n---\n\n"
-
-
 def _merge_entity_dicts_latest_wins(*entities: dict) -> dict:
 	"""Later dicts override earlier ones for the same key when the new value is non-empty."""
 	out: dict = {}
@@ -307,15 +355,6 @@ def _merge_extraction_payloads(*payloads: dict) -> dict:
 	}
 
 
-def _split_thread_plain_text_segments(plain_text: str) -> list[str]:
-	if not (plain_text or "").strip():
-		return []
-	if _THREAD_PLAIN_TEXT_SEP not in plain_text:
-		return [plain_text.strip()]
-	parts = plain_text.split(_THREAD_PLAIN_TEXT_SEP)
-	return [p.strip() for p in parts if p.strip()]
-
-
 def _normalize_seat_count(value: Any) -> str:
 	"""
 	Seats are represented by `passenger_number` in the extracted booking JSON.
@@ -342,7 +381,7 @@ def _build_extractor_prompt(*, plain_text: str, cab_settings) -> str:
 			"FC Cab Settings.prompt must include the placeholder `{email_text}` for the message body"
 		)
 	thread_hint = ""
-	if _THREAD_PLAIN_TEXT_SEP in (plain_text or ""):
+	if THREAD_MERGE_SEPARATOR in (plain_text or ""):
 		thread_hint = (
 			"The input may contain MULTIPLE messages separated by blank lines and '---'. "
 			"Treat them as ONE email thread in chronological order (oldest first). "
@@ -465,7 +504,7 @@ def process_payload_to_trip_request(
 		sender_email, sender_name = _extract_sender_email_and_name(email_sender)
 
 		missing_required = _missing_required_booking_fields(bookings=bookings, booked_by=booked_by)
-		segments = _split_thread_plain_text_segments(plain_text)
+		segments = split_thread_plain_text_segments(plain_text)
 		if missing_required and len(segments) > 1:
 			segment_payloads: list[dict] = []
 			segment_outputs: list[str] = []
