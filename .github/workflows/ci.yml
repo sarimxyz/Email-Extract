@@ -87,7 +87,6 @@ jobs:
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
 
-          bench --site test_site install-app erpnext
           bench --site test_site install-app fab_cars
           bench build
 
