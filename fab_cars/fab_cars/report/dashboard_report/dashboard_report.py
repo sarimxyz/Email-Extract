@@ -7,9 +7,15 @@ def execute(filters=None):
 	from_date = filters.get("from_date")
 	to_date = filters.get("to_date")
 	trip_status = filters.get("trip_request_status")
+	start = int(filters.get("start") or 0)
+	page_length = int(filters.get("page_length") or 20)
+	if page_length < 1:
+		page_length = 20
+	if start < 0:
+		start = 0
 
-	# Calculate number cards
-	number_cards = get_number_cards(from_date, to_date)
+	# Number cards (DB-side aggregation; no Python full scans).
+	number_cards = get_number_cards(from_date, to_date, trip_status=trip_status)
 
 	columns = [
 		{"label": "Email Sender", "fieldname": "sender", "fieldtype": "Data", "width": 200},
@@ -19,7 +25,7 @@ def execute(filters=None):
 			"label": "Extracted Email",
 			"fieldname": "extracted_email",
 			"fieldtype": "Link",
-			"options": "FC Extracted Email",
+			"options": "FC Raw Email Log",
 			"width": 200,
 		},
 		{
@@ -37,96 +43,123 @@ def execute(filters=None):
 
 	data = []
 
-	filters_dict = {}
-	if trip_status:
-		filters_dict["trip_request_status"] = trip_status
+	# DB-side filtering + pagination.
+	where_clauses = []
+	params: dict = {}
 
-	# Fetch extracted emails (filtered by status only for now)
-	extracted_emails = frappe.get_all(
-		"FC Extracted Email",
-		filters=filters_dict,
-		fields=["name", "sender", "subject", "received_date", "trip_request_status", "communication_link"],
+	if trip_status:
+		where_clauses.append("r.status = %(trip_status)s")
+		params["trip_status"] = trip_status
+
+	if from_date and to_date:
+		# Date inputs are `YYYY-MM-DD`; expand to full-day range.
+		params["from_dt"] = f"{from_date} 00:00:00"
+		params["to_dt"] = f"{to_date} 23:59:59"
+		where_clauses.append("r.received_at BETWEEN %(from_dt)s AND %(to_dt)s")
+
+	where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+	# Total count for pagination controls.
+	total_count = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) as cnt
+		FROM `tabFC Raw Email Log` r
+		WHERE {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	total_count = int(total_count[0].get("cnt") or 0) if total_count else 0
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			r.name,
+			r.sender,
+			r.subject,
+			r.received_at,
+			r.status as trip_request_status,
+			t.name as trip_request,
+			t.city as city,
+			t.required_vehicle_type as vehicle_type,
+			t.remarks as remarks
+		FROM `tabFC Raw Email Log` r
+		LEFT JOIN `tabFC Trip Request` t
+			ON t.mail_link = r.name
+		WHERE {where_sql}
+		ORDER BY r.received_at desc, r.name desc
+		LIMIT %(limit)s OFFSET %(offset)s
+		""",
+		{**params, "limit": page_length, "offset": start},
+		as_dict=True,
 	)
 
-	# Filter by date in Python since received_date is a Data field
-	if from_date and to_date:
-		from frappe.utils import getdate
-
-		filtered_emails = []
-		for email in extracted_emails:
-			if email.received_date:
-				try:
-					email_date = getdate(email.received_date)
-					if getdate(from_date) <= email_date <= getdate(to_date):
-						filtered_emails.append(email)
-				except Exception:
-					# If date parsing fails, skip this email
-					continue
-		extracted_emails = filtered_emails
-
-	for email in extracted_emails:
-		# Match with trip request
-		trip = frappe.db.get_value(
-			"FC Trip Request",
-			{"mail_link": email.communication_link},
-			["name", "city", "vehicle_type", "remarks"],
-			as_dict=True,
-		)
-
+	for row in rows or []:
 		data.append(
 			{
-				"sender": email.sender,
-				"subject": email.subject,
-				"received_date": email.received_date,
-				"extracted_email": email.name,
-				"trip_request": trip.name if trip else "",
-				"trip_request_status": email.trip_request_status,
-				"city": trip.city if trip else "",
-				"vehicle_type": trip.vehicle_type if trip else "",
-				"remarks": trip.remarks if trip else "",
+				"sender": row.sender or "",
+				"subject": row.subject or "",
+				"received_date": row.received_at,
+				"extracted_email": row.name,
+				"trip_request": row.trip_request or "",
+				"trip_request_status": row.trip_request_status or "",
+				"city": row.city or "",
+				"vehicle_type": row.vehicle_type or "",
+				"remarks": row.remarks or "",
 			}
 		)
 
-	return columns, data, None, None, number_cards
+	return columns, data, None, None, number_cards, total_count
 
 
 def get_number_cards(from_date=None, to_date=None, trip_status=None):
-	"""Calculate number cards for the dashboard"""
-	from frappe.utils import getdate
+	"""Aggregate counts for dashboard number cards via DB-side filters."""
+	where_clauses = []
+	params: dict = {}
 
-	# Date filter for communications
-	comm_filters = {}
-	if from_date and to_date:
-		comm_filters["creation"] = ["between", [from_date, to_date]]
-
-	# Total emails received (from Communication doctype)
-	total_emails_received = frappe.db.count("Communication", comm_filters)
-
-	# Total emails extracted (from Extracted Email)
-	# Since received_date is a Data field, we need to filter manually
-	all_extracted_emails = frappe.get_all("FC Extracted Email", fields=["received_date"])
-	total_emails_extracted = len(all_extracted_emails)
-
-	if from_date and to_date:
-		filtered_count = 0
-		for email in all_extracted_emails:
-			if email.received_date:
-				try:
-					email_date = getdate(email.received_date)
-					if getdate(from_date) <= email_date <= getdate(to_date):
-						filtered_count += 1
-				except Exception:
-					continue
-		total_emails_extracted = filtered_count
-
-	# Total trip requests generated (from Trip Request)
-	# Trip requests
-	trip_filters = {}
-	if from_date and to_date:
-		trip_filters["creation"] = ["between", [from_date, to_date]]
 	if trip_status:
-		trip_filters["trip_request_status"] = trip_status
-	total_trip_requests = len(frappe.get_all("FC Trip Request", filters=trip_filters, fields=["name"]))
+		where_clauses.append("r.status = %(trip_status)s")
+		params["trip_status"] = trip_status
+
+	if from_date and to_date:
+		params["from_dt"] = f"{from_date} 00:00:00"
+		params["to_dt"] = f"{to_date} 23:59:59"
+		where_clauses.append("r.received_at BETWEEN %(from_dt)s AND %(to_dt)s")
+
+	where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+	total_emails_received = frappe.db.sql(
+		f"SELECT COUNT(*) as cnt FROM `tabFC Raw Email Log` r WHERE {where_sql}",
+		params,
+		as_dict=True,
+	)
+	total_emails_received = int(total_emails_received[0].get("cnt") or 0) if total_emails_received else 0
+
+	# Respect the same status filter, but only consider successful/failed as "extracted".
+	total_emails_extracted = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) as cnt
+		FROM `tabFC Raw Email Log` r
+		WHERE {where_sql}
+			AND r.status IN ('Successful', 'Failed')
+		""",
+		params,
+		as_dict=True,
+	)
+	total_emails_extracted = int(total_emails_extracted[0].get("cnt") or 0) if total_emails_extracted else 0
+
+	total_trip_requests = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) as cnt
+		FROM `tabFC Trip Request` t
+		INNER JOIN `tabFC Raw Email Log` r
+			ON t.mail_link = r.name
+		WHERE {where_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+	total_trip_requests = int(total_trip_requests[0].get("cnt") or 0) if total_trip_requests else 0
 
 	return [
 		{"value": total_emails_received, "label": "Total Emails Received", "datatype": "Int"},

@@ -47,7 +47,7 @@
    "fieldname": "trip_request_status",
    "fieldtype": "Select",
    "label": "Trip Request Status",
-   "options": "Pending\nSuccessful\nFailed"
+    "options": "Pending\nNeeds Info\nSuccessful\nFailed"
   },
   {
    "fieldname": "trip_request_error",

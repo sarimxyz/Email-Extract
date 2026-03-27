@@ -1,6 +1,6 @@
 # Email → Trip Request Automation (Frappe) — README
 
-> **Project**: Automate creation of `Trip Request` documents in ERPNext/Frappe from incoming cab-booking emails.
+> **Project**: Automate creation of `FC Trip Request` documents in ERPNext/Frappe from incoming cab-booking emails.
 
 ---
 
@@ -10,7 +10,7 @@
 2. Architecture & flow (detailed)
 3. Frappe doctypes used / created
 4. Scripts & key modules (what each file does)
-5. Prompt & Claude integration
+5. Prompt & LLM integration (Anthropic / OpenAI)
 6. Data validation & mapping rules
 7. Attachment handling (current + future)
 8. Key issues encountered & how they were resolved
@@ -24,13 +24,13 @@
 
 ## 1) Project overview
 
-This project listens to incoming emails (specifically **cab booking** mails) recorded in the Frappe `Communication` doctype, extracts booking information (pickup, drop, date/time, employee, contact, notes, attachments) using **Claude** (Anthropic) and converts the structured output into a `Trip Request` document.
+This project listens to incoming emails (specifically **cab booking** mails) recorded in the Frappe `Communication` doctype, extracts booking information using **Claude** (Anthropic) and converts the structured output into an `FC Trip Request` document.
 
 Goals:
 
 * Remove manual data entry for cab bookings
 * Standardize capture of pickup/drop/time/employee/phone
-* Persist attachments or references
+* Persist extracted booking data and parse failures for review
 * Robust error handling and traceable logs
 
 Audience: devs who maintain the Frappe site, your supervisor, and future contributors.
@@ -43,9 +43,9 @@ Audience: devs who maintain the Frappe site, your supervisor, and future contrib
 
 * **Frappe server**: primary runtime and database
 * **Communication doctype**: incoming emails are stored here by existing email integration
-* **Custom doctype: `Extracted Email New`**: intermediate storage of the raw email body + extraction status + AI output
+* **Custom doctype: `FC Extracted Email`**: intermediate storage of the extracted email text + extraction status
 * **AI layer: Claude (Anthropic)**: extracts structured JSON from free-text email content
-* **Trip Request doctype**: target doctype where final structured booking is saved
+* **Trip Request doctype**: `FC Trip Request` doctype where final structured booking is saved
 * **Script(s)**: Python scripts (Frappe server-side) that orchestrate the above
 * **Logging**: console prints + Frappe logs + document-level status fields
 
@@ -53,15 +53,15 @@ Audience: devs who maintain the Frappe site, your supervisor, and future contrib
 
 1. **Fetch incoming emails**
 
-   * Query `Communication` for messages with subject match (e.g. "cab booking") or other filters (status `'Sent'`/`'Received'` depending on setup).
+   * Query `Communication` for received emails, then use Claude to classify whether each email is a cab/taxi/vehicle booking.
 
-2. **Create/append to `Extracted Email New`**
+2. **Create/append to `FC Extracted Email`**
 
-   * For each fetched email create an `Extracted Email New` document containing `source_emailid`, `subject`, `from`, `raw_html`, `raw_text`, `received_on`, and a `status` field (`pending`, `ai_processed`, `error`).
+   * For each candidate email create an `FC Extracted Email` document containing `source_email_id`, `sender`, `subject`, `message_body`, `received_date`, and `communication_link`.
 
 3. **Parse email body**
 
-   * Use `BeautifulSoup` to extract clean text from HTML email body. Normalize whitespace, remove signatures when possible (a best-effort pattern), keep attachments metadata.
+   * Use `BeautifulSoup` to extract clean plain text from the HTML email body. Normalize whitespace and remove signatures when possible (best-effort); attachments are not parsed in the current version.
 
 4. **Prepare AI prompt**
 
@@ -73,25 +73,21 @@ Audience: devs who maintain the Frappe site, your supervisor, and future contrib
 
 6. **Parse AI output**
 
-   * Attempt to parse the response as JSON. If parsing fails, run fallback attempts (stricter prompt, or regex extraction). Save raw AI output in `Extracted Email New.ai_output`.
+   * Attempt to parse the Claude response as JSON. If parsing fails, the processor marks `FC Extracted Email.trip_request_status = "Failed"` and stores details in `FC Extracted Email.trip_request_error`.
 
-7. **Validate & transform**
+7. **Transform & insert**
 
-   * Validate mandatory fields (e.g., `pickup_location`, `drop_location` and `pickup_datetime` where applicable).
-   * Normalize `pickup_datetime` into a timezone-aware ISO format used by Frappe.
+8. **Create `FC Trip Request`**
 
-8. **Create `Trip Request`**
-
-   * Map validated fields into the `Trip Request` doctype fields and `insert()` the document.
-   * Save mapping metadata: `extracted_email_id`, `ai_confidence` (if available), `created_by_script` flags.
+   * Map extracted JSON into the `FC Trip Request` doctype fields and `insert()` the document.
 
 9. **Handle attachments**
 
-   * Save attachment references to the `Trip Request` (or attach files to the Frappe file system). If inline images are present, create file docs.
+   * Not implemented in the current version: the processor extracts only plain text from the email body.
 
 10. **Update status & logging**
 
-    * Mark `Extracted Email New.status = 'ai_processed'` or `'error'` with an error message.
+    * Mark `FC Extracted Email.trip_request_status` to `"Successful"` or `"Failed"` (and record an error message on failure).
     * Console/log prints for each major step.
 
 ---
@@ -101,27 +97,42 @@ Audience: devs who maintain the Frappe site, your supervisor, and future contrib
 ### Existing
 
 * `Communication` – contains incoming email metadata and body
-* `Trip Request` – target doctype in ERPNext
+* `FC Trip Request` – target doctype in Frappe
 
 ### Custom
 
-* `Extracted Email New`
+* `FC Extracted Email`
 
-  * **Fields (recommended)**:
+  * **Fields (actual in this app)**:
 
-    * `source_emailid` (Data/Link): link back to `Communication` (unique id)
+    * `sender` (Data)
     * `subject` (Data)
-    * `from` (Data)
-    * `received_on` (Datetime)
-    * `raw_html` (Text)
-    * `raw_text` (Text)
-    * `ai_prompt` (Text)
-    * `ai_output` (Text)
-    * `ai_parsed` (JSON)
-    * `status` (Select): `pending`, `ai_processed`, `error`, `skipped`
-    * `error_message` (Text)
-    * `trip_request_ref` (Link) — created Trip Request doc name
-    * `attachments` (Table / Child table) – list of files metadata
+    * `message_body` (Long Text)
+    * `received_date` (Data)
+    * `communication_link` (Link -> `Communication`)
+    * `trip_request_status` (Select: `Pending`, `Successful`, `Failed`)
+    * `trip_request_error` (Long Text)
+    * `source_email_id` (Data)
+    * `has_multiple_bookings` (Check)
+    * `number_of_bookings` (Int)
+
+* **`FC Cab Settings`** (singleton)
+
+  * **`prompt`** (Long Text) — extraction prompt template; must include `{email_text}`.
+
+* **`FC LLM Settings`** (singleton) — **primary place to configure AI providers** (doctype-only at runtime).
+
+  * **`llm_provider`** — `Anthropic` or `OpenAI`.
+  * **`anthropic_api_key`** / **`openai_api_key`** — stored as **Password** fields (encrypted in the database).
+  * **Model IDs** — classifier and extractor model names per provider (defaults match the code’s built-in fallbacks).
+  * **OpenAI** — optional `openai_base_url` (e.g. Azure OpenAI or compatible gateways) and `openai_timeout_seconds`.
+
+  Runtime configuration is sourced from **`FC LLM Settings` only** (no `frappe.local.conf` / site_config fallbacks).
+
+* **`FC Ingestion Settings`** (singleton)
+  * `max_attempts` — maximum number of extraction attempts for a single `FC Raw Email Log`.
+
+* **`FC Raw Email Log`** — audit + idempotency for the event-driven ingestion API (`ingest_email`): raw metadata, `plain_text`, status, errors, link to `FC Trip Request`.
 
 ---
 
@@ -129,29 +140,28 @@ Audience: devs who maintain the Frappe site, your supervisor, and future contrib
 
 ### Files (logical grouping)
 
-* `email_processor.py` — orchestrates fetching, parsing, saving to `Extracted Email New`, calling AI, validation and Trip Request creation.
-* `utils/email_parsing.py` — email-specific parsing utilities using BeautifulSoup, signature trimming heuristics.
-* `utils/ai_client.py` — wrapper for Claude (Anthropic) client call including rate-limiting and retries.
-* `utils/validation.py` — normalization & validation functions (datetime parsing, phone normalization, location heuristics).
-* `utils/attachments.py` — saving files into Frappe file system and linking to Trip Request.
+* `fab_cars/doctype/fc_extracted_email/fc_extracted_email.py` — classifier + extraction + `FC Trip Request` creation (`process_payload_to_trip_request`; legacy `Communication` polling may still exist but is disabled via hooks when using ingestion only).
+* `fab_cars/llm/llm_client.py` — **provider-agnostic** LLM calls (Anthropic or OpenAI) using **`FC LLM Settings` only**.
+* `BeautifulSoup` — optional; used for legacy HTML email cleanup when reading `Communication`.
+* `FC Cab Settings.prompt` — extraction prompt template (must include `{email_text}`).
+* `FC LLM Settings` — API keys and model names for Anthropic/OpenAI (Desk UI).
+* Attachments — not processed yet (the current version only sends email body text to Claude).
 
-### Key functions (pseudocode)
+### Core processor (what to look for in code)
 
-* `fetch_unprocessed_emails(filter)` — returns list of `Communication` docs
-* `create_extracted_email_doc(comm_doc)` — creates `Extracted Email New` doc and returns it
-* `clean_email_body(raw_html)` — returns `raw_text`
-* `build_claude_prompt(clean_text)` — returns string prompt
-* `call_claude(prompt)` — returns AI text response
-* `parse_ai_response_to_json(ai_text)` — returns dict or raises
-* `validate_and_map_to_trip(parsed_json)` — returns `trip_data` or raises validation error
-* `create_trip_request(trip_data)` — inserts Trip Request and returns doc
-* `attach_files(trip_doc, files)` — link attachments
+* `process_received_emails_to_trip_requests()` — end-to-end flow:
+  * fetch received `Communication` docs
+  * classifier Claude call: cab/taxi booking or not
+  * create `FC Extracted Email`
+  * extraction Claude call using `FC Cab Settings.prompt`
+  * parse JSON and insert `FC Trip Request` (+ `FC Multiple Booking` child rows)
 
-Include defensive `try/except` and patch failures to `Extracted Email New.error_message`.
+Failures are handled defensively:
+* if Claude/extraction fails or output is not JSON, the processor sets `FC Extracted Email.trip_request_status = "Failed"` and writes details into `FC Extracted Email.trip_request_error`.
 
 ---
 
-## 5) Prompt & Claude integration
+## 5) Prompt & LLM integration (Anthropic / OpenAI)
 
 ### Prompt Design Principles
 
@@ -165,14 +175,32 @@ Include defensive `try/except` and patch failures to `Extracted Email New.error_
 
 ```text
 You are a data extraction assistant. Given the plain text of an email, output ONLY a single JSON object (no preface, no comments) with the following keys:
+- summary (string or null)
+- vehicle_type (string or null)
+- city (string or null)
+- miscellaneous_requirements (string or null)
+- duty_type (string or null)
+- request_type (string or null)
+- special_request (string or null)
+- remarks (string or null)
+- notes (string or null)
+- booked_by (object or null) with keys: name, email, number
+- billed_to (object or null) with keys: name, email, number
+- point_of_contact (object or null) with keys: name, email, number
+- has_multiple_bookings (boolean)
+- number_of_bookings (integer)
+- bookings (array of booking objects)
+
+Where each booking object contains:
+- passenger_name (string or null)
+- passenger_number (string or null)
 - pickup_location (string or null)
 - drop_location (string or null)
-- pickup_datetime (string in ISO 8601, timezone-aware, or null)
-- employee_name (string or null)
-- phone_number (string or null, digits, include country code if present)
-- seats_required (integer or null)
-- additional_notes (string or null)
-- attachments_present (boolean)
+- pickup_date (string or null)
+- pickup_time (string or null)
+- drop_time (string or null)
+- reporting_time (string or null)
+- passenger_specific_request (string or null)
 If a field cannot be determined, use null.
 
 Email text:
@@ -183,30 +211,22 @@ Email text:
 Return the JSON now.
 ```
 
-### Claude client notes
+### LLM client notes (`llm_client.py`)
 
-* We *fully* use Claude (Anthropic) instead of OpenAI — ensure your Anthropic client is configured and keys are in environment variables (e.g. `ANTHROPIC_API_KEY`).
-* The wrapper `ai_client.py` should:
-
-  * Log request/response sizes (for debugging token usage)
-  * Save the raw prompt and raw response to `Extracted Email New` for traceability
-  * Apply a retry strategy: `try up to 2 more times with a stricter prompt` if response isn't valid JSON
+* Configure **Anthropic** or **OpenAI** in **`FC LLM Settings`** (recommended). API keys are encrypted Password fields.
+* Default models (if you leave the model fields blank in the form, the code still applies built-in defaults): Anthropic `claude-4-sonnet-20250514`, OpenAI `gpt-4o-mini` — override per field in `FC LLM Settings` as needed.
+* The extraction prompt is stored in singleton **`FC Cab Settings`** (`prompt`); the processor replaces `{email_text}` with the cleaned email body.
+* The app expects the model to return **JSON**; parsing or LLM failures mark `FC Extracted Email.trip_request_status = "Failed"` and/or `FC Raw Email Log.status = Failed` with `last_error` where applicable.
 
 ---
 
 ## 6) Data validation & mapping rules
 
-When mapping extracted JSON to `Trip Request` fields, apply the following rules:
+When mapping extracted JSON to `FC Trip Request` fields, the processor assumes Claude returns a JSON object in the shape that `process_received_emails_to_trip_requests()` expects.
 
-* **Mandatory fields**: `pickup_location`, `drop_location`. If missing — mark `status='error'` and leave for manual review.
-* **Datetime parsing**:
-
-  * Accept formats: `DD-MM-YYYY`, `DD/MM/YYYY`, `YYYY-MM-DD`, with optional time.
-  * If *date* present but no *time*, default to company policy time (e.g., `09:00`) or `null` per policy.
-  * Always convert to ISO 8601 with timezone (use server timezone or email timezone if provided).
-* **Phone numbers**: strip all non-digit chars, preserve leading `+` if present. Validate length (min 7 digits).
-* **Employee identification**: try to map `employee_name` to an existing Employee doctype by fuzzy match; if multiple matches, do not create trip automatically — mark for manual review.
-* **Duplicate detection**: check for existing `Trip Request` with same `pickup_datetime`, `pickup_location`, and `employee` within a time-window (e.g., 30 minutes) to avoid duplicate creation.
+If the Claude call fails or the extraction output is not valid JSON, the processor sets:
+* `FC Extracted Email.trip_request_status = "Failed"`
+* `FC Extracted Email.trip_request_error = <details>`
 
 ---
 
@@ -214,16 +234,10 @@ When mapping extracted JSON to `Trip Request` fields, apply the following rules:
 
 ### Current state
 
-* Attachments are detected from `Communication` metadata and references are saved in `Extracted Email New.attachments` as metadata (filename, size, content-type).
-* Full file saving into Frappe `File` doctype or linking to `Trip Request` is a stub (implementation pending), though the code path collects and logs attachments.
+* Attachments are not processed by the current implementation. The processor extracts plain text from the email HTML (`Communication.content`) and sends it to Claude.
 
 ### Recommended implementation
-
-* For each attachment:
-
-  * Save to Frappe files using `frappe.get_doc({"doctype": "File", "file_name": filename, "content": base64_content, "attached_to_doctype": "Trip Request", "attached_to_name": trip_doc.name}).insert()`
-  * For large files or PDFs, consider storing in S3 / external and keep reference URL in the Trip Request.
-* If attachment is an image of a booking screenshot, optionally send to OCR (Tesseract or cloud OCR) to extract additional info as fallback.
+* In the future, implement attachment saving (`File` docs) and/or OCR for screenshots, then include extracted text back into Claude for better parsing.
 
 ---
 
@@ -238,20 +252,20 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 
 * Claude/Anthropic client returns different metadata fields compared to OpenAI. Code expecting OpenAI-style `.usage` or `.get('usage')` would fail or yield zeros. Also older/trial keys or certain response types might omit usage fields.
   **Fix applied**:
-* Standardize the wrapper `ai_client.py` to never rely on OpenAI-specific fields. Instead:
+* Update the processor logic to never rely on OpenAI-specific response metadata. Instead:
 
-  * Save full raw response JSON into `Extracted Email New.ai_output`.
+  * Save the raw extraction JSON into `FC Trip Request.ai_json_response` (and store parse errors on `FC Extracted Email.trip_request_error`).
   * Log request size and response size locally (len of strings) to approximate token counts for debugging.
   * Add defensive code: `response_metadata = getattr(response, 'metadata', None) or response` and then inspect keys safely.
 
-### Issue: `Trip Request` not created while `Extracted Email New` exists
+### Issue: `FC Trip Request` not created while `FC Extracted Email` exists
 
-**Symptoms**: `Extracted Email New` documents were being created, but Trip Request creation failed silently.
+**Symptoms**: `FC Extracted Email` documents were being created, but `FC Trip Request` creation failed silently.
 **Root cause**:
 
 * Uncaught exceptions during validation or insert (e.g., `InvalidDocTypeError` or mapping key missing) were swallowed, or `autocommit` behaviour in Frappe prevented the insert from persisting.
   **Fix applied**:
-* Add `try/except` around mapping + creation and save stacktrace to `Extracted Email New.error_message`.
+* Add `try/except` around mapping + creation and save stacktrace to `FC Extracted Email.trip_request_error`.
 * Use `trip_doc.insert()` followed by `frappe.db.commit()` to ensure persistence in non-HTTP contexts (scripts run from bench console need explicit commit).
 * Add checks for mandatory fields and early return with clear status and message.
 
@@ -271,7 +285,7 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 **Cause**: synchronous calls to network (AI) without timeouts, large attachments, or running within limited worker slots.
 **Fix applied**:
 
-* Add request timeouts and retries in `ai_client.py`.
+* Add request timeouts/retries around the Claude calls in `process_received_emails_to_trip_requests()`.
 * Use `frappe.enqueue()` for processing each email as a background job when running under production with workers, or run the script in a non-blocking thread when called from bench console.
 * Put a hard cap on attachments processed per email (configurable) and stream large file uploads rather than holding in memory.
 
@@ -281,8 +295,8 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 **Fix applied**:
 
 * Add a `--verbose` flag in the script that sets `frappe.logger.setLevel(logging.DEBUG)` and `print()`s stepwise progress.
-* Write the last exception traceback into `Extracted Email New.error_message` so it's visible in Desk.
-* Add a `frappe.get_doc('Extracted Email New', name).print_format()` helper for quick inspection.
+* Write the last exception traceback into `FC Extracted Email.trip_request_error` so it's visible in Desk.
+* Add a `frappe.get_doc('FC Extracted Email', name).print_format()` helper for quick inspection.
 
 ### Issue: `source_emailid` mapping problems
 
@@ -290,7 +304,7 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 **Fix applied**:
 
 * Use stable unique key `communication.name` (the docname) as `source_emailid`. When fetching, ensure the script uses `comm_doc.name` (not `comm_doc.reference` or `id`).
-* Save `communication_id` and `communication_creation` timestamps in `Extracted Email New` for traceability.
+* Save `Communication` link (`communication_link`) and `source_email_id` in `FC Extracted Email` for traceability.
 
 ---
 
@@ -299,7 +313,7 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 ### Logs to check
 
 * Frappe error log (bench logs)
-* `Extracted Email New` documents (status, error_message, ai_output)
+* `FC Extracted Email` documents (`trip_request_status`, `trip_request_error`)
 * Console STDOUT if run manually
 
 ### Helpful commands
@@ -307,35 +321,53 @@ Below are the concrete issues you reported and the exact fixes applied. Keep the
 * Run interactive function from bench:
 
 ```bash
-bench --site yoursite execute path.to.email_processor.process_received_emails_to_trip_requests --args "[]"
+bench --site yoursite execute fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.process_received_emails_to_trip_requests --args "[]"
 ```
 
-* Inspect an `Extracted Email New` doc from bench console:
+* Inspect an `FC Extracted Email` doc from bench console:
 
 ```python
 import frappe
-doc = frappe.get_doc('Extracted Email New', 'NAME')
-print(doc.status)
-print(doc.ai_output)
-print(doc.error_message)
+doc = frappe.get_doc('FC Extracted Email', 'NAME')
+print(doc.trip_request_status)
+print(doc.trip_request_error)
+print(doc.has_multiple_bookings)
+print(doc.number_of_bookings)
 ```
 
-* Create a Trip Request manually for debugging:
+* Create a `FC Trip Request` manually for debugging:
 
 ```python
-from frappe.utils import now
-trip = frappe.new_doc('Trip Request')
-trip.employee = 'EMP/0001'
-trip.pickup_location = 'A'
-trip.drop_location = 'B'
-trip.pickup_datetime = now()
+trip = frappe.new_doc('FC Trip Request')
+trip.trip_name = 'DEBUG_TRIP_1'
+trip.city = 'Test City'
+trip.required_vehicle_type = 'Taxi'
+trip.remarks = 'Debug'
+trip.mail_link = 'Communication-0000000'
+trip.email_message_body = 'Test email body'
+trip.ai_json_response = '{}'
+trip.ai_token_usage = 0
+trip.append(
+	'table_lftf',
+	{
+		'passenger_name': 'Test Passenger',
+		'passenger_number': '0000000000',
+		'pickup_location': 'A',
+		'drop_location': 'B',
+		'pickup_date': '',
+		'pickup_time': '',
+		'drop_time': '',
+		'reporting_time': '',
+		'passenger_special_request': '',
+	},
+)
 trip.insert()
 frappe.db.commit()
 ```
 
 ### Common failure points & how to inspect
 
-* **AI returned non-JSON**: open `Extracted Email New.ai_output`; re-run parsing function locally, save exception.
+* **AI returned non-JSON**: check `FC Extracted Email.trip_request_error`.
 * **Datetime parsing issues**: dump `parsed_json['pickup_datetime']` and run `frappe.utils.get_datetime` on it.
 * **Insert failing**: wrap creation with `frappe.log_error(str(e), 'trip_creation_failed')` and check `logs/error-log`.
 
@@ -353,7 +385,7 @@ frappe.db.commit()
 * Alternatively, set up a `cron` job on the server calling a bench execute command; example crontab:
 
 ```cron
-*/5 * * * * cd /path/to/frappe-bench && bench --site yoursite execute path.to.email_processor.process_received_emails_to_trip_requests >> /var/log/email_processor.log 2>&1
+*/5 * * * * cd /path/to/frappe-bench && bench --site yoursite execute fab_cars.fab_cars.doctype.fc_extracted_email.fc_extracted_email.process_received_emails_to_trip_requests >> /var/log/email_processor.log 2>&1
 ```
 
 **Important**: If using cron do not forget `frappe.db.commit()` in code paths where changes must persist.
@@ -361,16 +393,16 @@ frappe.db.commit()
 ### Resource considerations
 
 * Keep AI requests batched sensibly if you have rate limits.
-* Monitor worker slots and memory if attachments are processed.
+* Monitor worker slots and memory for large emails / heavy Claude calls.
 
 ---
 
 ## 11) Testing & QA checklist
 
-* [ ] Unit tests for `clean_email_body` against common HTML variants
-* [ ] Unit tests for `parse_ai_response_to_json` including malformed outputs
+* [ ] Unit tests for HTML-to-plain-text extraction (BeautifulSoup) behavior
+* [ ] Unit tests for Claude extraction JSON parsing + failure handling
 * [ ] Integration test: run script on a sample mailbox replica
-* [ ] End-to-end test: ensure a real email creates a `Trip Request` in a test site
+* [ ] End-to-end test: ensure a real email creates an `FC Trip Request` in a test site
 * [ ] Fuzzy match tests for mapping `employee_name` → Employee doctype
 * [ ] Duplicate detection tests
 
@@ -381,7 +413,7 @@ frappe.db.commit()
 * Full implementation of attachments → `File` docs + linking
 * OCR pipeline for screenshots to extract addresses/dates as fallback
 * Improve fuzzy matching for Employee mapping (use trigram similarity or external search index)
-* Add an Admin UI in Desk to review `Extracted Email New` items that failed parsing
+* Add an Admin UI in Desk to review `FC Extracted Email` items that failed parsing
 * Add a small ML model or rule-based post-processor to normalize free-text pickup/drop locations into more canonical names
 
 ---
@@ -405,32 +437,73 @@ Employee Name
 
 ```json
 {
-  "pickup_location": "Rama Metro Life, C Tower, Opposite D Mart",
-  "drop_location": "Bel apartment",
-  "pickup_datetime": "2025-10-16T09:30:00+05:30",
-  "employee_name": "Rohit",
-  "phone_number": "+919876543210",
-  "seats_required": 1,
-  "additional_notes": null,
-  "attachments_present": false
+  "summary": "Cab booking request",
+  "vehicle_type": "Taxi",
+  "city": "Delhi",
+  "miscellaneous_requirements": null,
+  "duty_type": null,
+  "request_type": null,
+  "special_request": null,
+  "remarks": null,
+  "notes": null,
+  "booked_by": {
+    "name": "Rohit",
+    "email": null,
+    "number": "+919876543210"
+  },
+  "billed_to": {
+    "name": null,
+    "email": null,
+    "number": null
+  },
+  "point_of_contact": {
+    "name": null,
+    "email": null,
+    "number": null
+  },
+  "has_multiple_bookings": false,
+  "number_of_bookings": 1,
+  "bookings": [
+    {
+      "passenger_name": "Rohit",
+      "passenger_number": "+919876543210",
+      "pickup_location": "Rama Metro Life, C Tower, Opposite D Mart",
+      "drop_location": "Bel apartment",
+      "pickup_date": "2025-10-16",
+      "pickup_time": "09:30",
+      "drop_time": null,
+      "reporting_time": null,
+      "passenger_specific_request": null
+    }
+  ]
 }
 ```
 
 ### Example: final Trip Request mapping to doctype fields
 
-* `trip_request.employee_name` ← `employee_name`
-* `trip_request.contact_number` ← `phone_number`
-* `trip_request.pickup_from` ← `pickup_location`
-* `trip_request.drop_at` ← `drop_location`
-* `trip_request.pickup_datetime` ← `pickup_datetime`
-* `trip_request.notes` ← `additional_notes`
-* Attach `File` docs to trip request if present
+* `FC Trip Request.summary` ← `summary`
+* `FC Trip Request.required_vehicle_type` ← `vehicle_type`
+* `FC Trip Request.city` ← `city`
+* `FC Trip Request.miscellaneous_requirements` ← `miscellaneous_requirements`
+* `FC Trip Request.duty_type` ← `duty_type`
+* `FC Trip Request.request_type` ← `request_type`
+* `FC Trip Request.special_request` ← `special_request`
+* `FC Trip Request.remarks` ← `remarks`
+* `FC Trip Request.notes` ← `notes`
+* `FC Trip Request.booked_by_*` ← `booked_by.{name,email,number}`
+* `FC Trip Request.billed_to_*` ← `billed_to.{name,email,number}`
+* `FC Trip Request.poc_*` ← `point_of_contact.{name,email,number}`
+* `FC Trip Request.table_lftf[]` (type `FC Multiple Booking`) ← each element of `bookings[]` into:
+  * `passenger_name`, `passenger_number`
+  * `pickup_location`, `drop_location`
+  * `pickup_date`, `pickup_time`, `drop_time`, `reporting_time`
+  * `passenger_specific_request`
 
 ---
 
 ## Contributing / contact
 
-If you need changes, open an issue in the repository or contact the maintainer (Sohail) directly. Include the `Extracted Email New` doc id when reporting a specific failing email.
+If you need changes, open an issue in the repository or contact the maintainer (Sohail) directly. Include the `FC Extracted Email` doc id when reporting a specific failing email.
 
 ---
 
